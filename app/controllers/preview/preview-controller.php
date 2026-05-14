@@ -169,6 +169,25 @@ class Preview_Controller extends Base_Controller {
 		$hydrated['app_name'] = (string) ( $row['app_name'] ?? '' );
 		$hydrated['screens']  = $this->collect_screens();
 
+		// Mirror the same enrichment chain `Frontend_Controller::handle_boot`
+		// runs for the regular `app.boot` payload. Without these, the
+		// preview app would see RAW admin-saved values and miss every
+		// integration-contributed override:
+		//   - Voxel's `App_Css_Controller` adds `.vx-full-popup` /
+		//     `.ts-popup-root` tweaks via the `appress/app/css` filter
+		//   - Voxel's `Subscreen_Patterns_Controller` injects
+		//     `/job-archive/*` etc. via `appress/app/subscreen_url_patterns`
+		//   - inline link selectors come from
+		//     `appress/app/inline_link_selectors` (admin textarea +
+		//     integration defaults)
+		// Without the merge, the customer's host-app preview render
+		// drifts from a real production app build — bug surfaced by
+		// the missing Voxel popup-top spacing rule on keden.pro.
+		$app_id = (int) $row['id'];
+		$hydrated['inline_link_selectors']  = \Appress\get_inline_link_selectors( $app_id );
+		$hydrated['subscreen_url_patterns'] = \Appress\get_subscreen_url_patterns( $app_id );
+		$hydrated = array_merge( $hydrated, \Appress\get_app_css( $app_id ) );
+
 		// Last-mile filter — same hook the live boot endpoint runs in
 		// `Frontend_Controller::handle_boot()`. Required so integrations
 		// that enrich the boot payload (TranslatePress's `translatepress`
@@ -177,7 +196,7 @@ class Preview_Controller extends Base_Controller {
 		// the customer's TRP languages never arrive → `handleChangeLanguage`
 		// in the native host bails at the variant lookup and language
 		// switching from inside Preview is a silent no-op.
-		$hydrated = (array) apply_filters( 'appress/app/live_config', $hydrated, (int) $row['id'] );
+		$hydrated = (array) apply_filters( 'appress/app/live_config', $hydrated, $app_id );
 
 		return $hydrated;
 	}

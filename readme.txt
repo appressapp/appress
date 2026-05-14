@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.9
+Stable tag: 1.0.0.10
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.10 =
+* Fixed: integration CSS rules (such as the Voxel popup spacing tweaks) now reach the preview app on reload.
+* Fixed: Updates tab version compare handled double-digit version segments incorrectly (e.g. 1.0.0.10 was treated as older than 1.0.0.9).
+
 = 1.0.0.9 =
 * Removed the legacy "Preview" tab from the App settings page.
 
@@ -189,6 +193,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.10 =
+Fixes integration CSS not reaching the preview app on reload, and a version compare bug on the Updates tab.
 
 = 1.0.0.9 =
 Removes the legacy Preview tab from the App settings page.
