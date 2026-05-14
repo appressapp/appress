@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.6
+Stable tag: 1.0.0.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.7 =
+* New: Plugin updates and rollback. Check for new versions, install the latest release, or roll back to a previous version directly from Appress → Settings → Updates.
+* New: Plugin updates show a notice across all admin pages when a new version is available, like other major plugins.
+
 = 1.0.0.6 =
 * TranslatePress: master toggle on the Integrations page now actually disables the integration site-wide — previously the boot endpoint kept emitting language variants even with the master off, pinning device-locale users to the wrong language.
 * Google Sign-In on Android: the account chooser now appears on every tap instead of silently auto-selecting the previously-used Google account.
@@ -175,6 +179,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.7 =
+Adds in-dashboard plugin updates and rollback — check, install, or revert versions without leaving WordPress.
 
 = 1.0.0.6 =
 TranslatePress master toggle now disables the integration site-wide correctly; Android Google Sign-In always shows account chooser.
