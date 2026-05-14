@@ -79,6 +79,11 @@ return [
 	\Appress\Controllers\App\Database_Controller::class,
 	\Appress\Controllers\App\Frontend_Controller::class,
 	\Appress\Controllers\App\Heartbeat_Controller::class,
+	// Cache invalidation — bumps every app's `live_config.update_time_hash`
+	// (the `app.boot` "up_to_date" gate) when the plugin version changes
+	// OR an integration is toggled in the Integrations admin page. Native
+	// apps re-pull fresh config on their next cold-start.
+	\Appress\Controllers\App\Cache_Invalidation_Controller::class,
 
 	\Appress\Controllers\App\Admin_Controller::class,
 	\Appress\Controllers\App\Apps_Controller::class,
