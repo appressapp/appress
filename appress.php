@@ -3,7 +3,7 @@
  * Plugin Name:       Appress — Mobile App Builder
  * Plugin URI:        https://appress.app
  * Description:       Build and manage multiple native mobile apps (iOS & Android) from a single site. No coding required.
- * Version:           1.0.0.11
+ * Version:           1.0.0.12
  * Requires at least: 5.8
  * Tested up to:      6.9
  * Requires PHP:      8.3
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
 }
 
-define( 'APPRESS_VERSION', '1.0.0.11' );
+define( 'APPRESS_VERSION', '1.0.0.12' );
 define( 'APPRESS_PLUGIN_FILE', __FILE__ );
 define( 'APPRESS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'APPRESS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

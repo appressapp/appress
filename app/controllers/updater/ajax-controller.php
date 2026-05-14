@@ -276,6 +276,18 @@ class Ajax_Controller extends Base_Controller {
 			];
 		}
 
+		// GitHub's `/releases?per_page=N` endpoint sorts by tag name
+		// LEXICALLY descending, NOT by date or version. That breaks for
+		// double-digit segments: `v1.0.0.9` lexically > `v1.0.0.11`
+		// because `'9' > '1'`, so the API returns `9, 8, 7, 11, 10`
+		// and the Vue side picks `1.0.0.9` as "Latest available" on a
+		// site running `1.0.0.11`. Sort with PHP's `version_compare`
+		// which knows numeric-segment semantics — drops the entire
+		// downstream chain into the expected newest-first order.
+		usort( $out, function ( $a, $b ) {
+			return version_compare( $b['version'], $a['version'] );
+		} );
+
 		set_transient( self::TRANSIENT_RELEASES, $out, self::TRANSIENT_TTL );
 		return $out;
 	}

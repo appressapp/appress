@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.11
+Stable tag: 1.0.0.12
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.12 =
+* Fixed: Updates tab "Latest available" picked the wrong version when releases had double-digit segments — now sorts releases with proper version comparison so 1.0.0.11 is correctly recognised as newer than 1.0.0.9.
+
 = 1.0.0.11 =
 * App config cache is now invalidated automatically whenever the plugin version changes or an integration is toggled on or off — installed apps pick up the fresh config on the next cold start without any extra admin save.
 
@@ -196,6 +199,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.12 =
+Fixes Updates tab picking the wrong "Latest available" version on releases with double-digit segments.
 
 = 1.0.0.11 =
 Plugin version changes and integration toggles now invalidate cached app configs automatically.
