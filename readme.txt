@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.12
+Stable tag: 1.0.0.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.13 =
+* Build dialog: free plans now see a clear "Upgrade Now" call-to-action with a direct link to manage their plan, plus a "Preview Free" shortcut for trying the app without buying a package.
+* Fixed: cramped spacing on Build dialog headings and helper text caused by WordPress admin styles overriding the modal layout.
+
 = 1.0.0.12 =
 * Fixed: Updates tab "Latest available" picked the wrong version when releases had double-digit segments — now sorts releases with proper version comparison so 1.0.0.11 is correctly recognised as newer than 1.0.0.9.
 
@@ -199,6 +203,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.13 =
+Build dialog adds an Upgrade Now button for free plans and fixes cramped spacing on modal headings.
 
 = 1.0.0.12 =
 Fixes Updates tab picking the wrong "Latest available" version on releases with double-digit segments.
