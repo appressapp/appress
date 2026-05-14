@@ -1,0 +1,14 @@
+/* Status-bar-height spacer — shortcode / Elementor / Bricks surfaces.
+ *
+ * Pure structure: height = native-injected `--appress-status-bar-height`
+ * (0px on web). Builders paint background-color directly via per-element
+ * controls. No internal padding / border so the spacer collapses cleanly
+ * outside the app.
+ */
+.appress-status-bar-height {
+	display: block;
+	width: 100%;
+	height: var(--appress-status-bar-height, 0px);
+	flex-shrink: 0;
+	pointer-events: none;
+}

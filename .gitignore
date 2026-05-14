@@ -1,0 +1,33 @@
+# ── Build artefacts + dev tooling ──
+# Vue admin source is dev-only — production assets ship pre-compiled
+# in `assets/dist/` (committed). The `dev/` folder is too large to
+# distribute and irrelevant to customer sites.
+/dev/
+/docs/
+/node_modules/
+
+# NOTE: `app/vendor/` is INTENTIONALLY committed — it's required at
+# runtime (firebase-php, plugin-update-checker, etc.) and WordPress
+# has no composer at install time, so a customer site cloned from
+# git or unzipped from the release asset must boot without an extra
+# `composer install` step. This matches the convention used by every
+# major WP plugin (Yoast SEO, WooCommerce, BuddyPress, etc.).
+# Composer dev-only deps stay excluded because we never `--require-dev`.
+
+# Internal tooling / agent notes — must not ship to customer sites
+# or appear in public GitHub repo.
+CLAUDE.md
+.gemini/
+.claude/
+
+# Build outputs from local zip helper
+*.zip
+
+# macOS finder cruft
+.DS_Store
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*~

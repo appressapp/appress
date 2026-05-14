@@ -1,0 +1,159 @@
+/* Shared Appress button base + every variant.
+ *
+ * Single source of truth for the look of every Appress button widget
+ * (`[appress_qr_login]`, `[appress_qr_scanner]`, `[appress_apple_login]`,
+ * `[appress_back_button]`, `[appress_dismiss_first_launch]`). Each
+ * shortcode emits `appress-btn appress-btn-{variant}` and the
+ * `Button_Controls_Trait` (Elementor; Bricks/Avada equivalents to
+ * follow) writes its style values as CSS custom properties at the
+ * `.appress-btn-{variant}` scope. Widgets stay byte-identical across
+ * surfaces because they all read the same CSS.
+ *
+ * Inner element contract (set by the shortcode controllers):
+ *   button.appress-btn.appress-btn-{variant}
+ *     └── span.appress-btn__icon-container          (always rendered)
+ *         └── svg.appress-btn__icon                  (default icon, OR
+ *             user-picked Elementor icon — same class)
+ *     └── span.appress-btn__label                   (rendered only when
+ *                                                    label is non-empty;
+ *                                                    `--appress-btn-icon-gap`
+ *                                                    only matters when both
+ *                                                    pieces exist)
+ */
+
+
+/* ─── Base ──────────────────────────────────────────────────────── */
+.appress-btn {
+	--appress-btn-bg:                              #ffffff;
+	--appress-btn-fg:                              #111827;
+	--appress-btn-border-width:                    1px;
+	--appress-btn-border-style:                    solid;
+	--appress-btn-border-color:                    #d1d5db;
+	--appress-btn-radius:                          9px;
+	--appress-btn-padding:                         0 16px;
+	--appress-btn-min-height:                      44px;
+	--appress-btn-icon-size:                       20px;
+	--appress-btn-icon-color:                      currentColor;
+	--appress-btn-icon-gap:                        8px;
+	--appress-btn-icon-container-size:             auto;
+	--appress-btn-icon-container-padding:          0;
+	--appress-btn-icon-container-bg:               transparent;
+	--appress-btn-icon-container-border-width:     0;
+	--appress-btn-icon-container-border-style:     solid;
+	--appress-btn-icon-container-border-color:     transparent;
+	--appress-btn-icon-container-radius:           0;
+	--appress-btn-label-color:                     currentColor;
+	--appress-btn-width:                           100%;
+	--appress-btn-min-width:                       auto;
+
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--appress-btn-icon-gap);
+	width: var(--appress-btn-width);
+	min-width: var(--appress-btn-min-width);
+	min-height: var(--appress-btn-min-height);
+	padding: var(--appress-btn-padding);
+	border: var(--appress-btn-border-width) var(--appress-btn-border-style) var(--appress-btn-border-color);
+	border-radius: var(--appress-btn-radius);
+	background: var(--appress-btn-bg);
+	color: var(--appress-btn-fg);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	font-size: 16px;
+	font-weight: 500;
+	line-height: 1.2;
+	cursor: pointer;
+	transition: opacity 0.12s ease, background-color 0.12s ease;
+	-webkit-tap-highlight-color: transparent;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	box-sizing: border-box;
+}
+.appress-btn:hover  { opacity: 0.92; }
+.appress-btn:active { opacity: 0.85; }
+.appress-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+.appress-btn:focus { outline: none; }
+.appress-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+.appress-btn__icon-container {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width:  var(--appress-btn-icon-container-size);
+	height: var(--appress-btn-icon-container-size);
+	padding: var(--appress-btn-icon-container-padding);
+	background: var(--appress-btn-icon-container-bg);
+	border: var(--appress-btn-icon-container-border-width) var(--appress-btn-icon-container-border-style) var(--appress-btn-icon-container-border-color);
+	border-radius: var(--appress-btn-icon-container-radius);
+	box-sizing: border-box;
+	flex-shrink: 0;
+	/* Cascade icon size + color so all three shapes the builders can
+	 * emit pick the controls up uniformly:
+	 *   - <svg>  → fill via currentColor, sized to 1em (below).
+	 *   - <i>    → font-size inherits (font icons size = font-size).
+	 *   - <img>  → sized to 1em (below).
+	 * Pre-fix the size var lived on `.appress-btn__icon` as
+	 * width/height, which was a no-op on <i> elements — Elementor /
+	 * Bricks / Avada all emit <i> for FontAwesome / Themify / Fusion
+	 * font picks, so the Size + Color controls silently did nothing
+	 * unless the user happened to pick an SVG icon. */
+	color: var(--appress-btn-icon-color);
+	font-size: var(--appress-btn-icon-size);
+	line-height: 1;
+}
+
+.appress-btn__icon {
+	flex-shrink: 0;
+	display: block;
+}
+
+/* SVG icons (default Apple/QR/etc. logo, user-picked SVG files).
+ * `1em` tracks the container's `font-size: var(--appress-btn-icon-size)`,
+ * so the Size control drives SVG dimensions identically to font icons.
+ *
+ * Do NOT set `fill` here — defaults are mixed (Apple uses
+ * `fill="currentColor"`, QR-scanner uses `fill="none" stroke="currentColor"`).
+ * A CSS `fill` would override SVG presentation attributes and fill in
+ * stroke-only icons. The Color control reaches both paints via
+ * `currentColor`, which inherits from `.appress-btn__icon-container`'s
+ * `color` rule above. */
+.appress-btn__icon-container svg {
+	width: 1em;
+	height: 1em;
+	display: block;
+}
+
+/* Font icons (<i class="fas fa-apple">, Themify, Fusion, etc.).
+ * font-size + color inherit naturally from the container; the explicit
+ * rule guards against icon-font frameworks that set their own
+ * font-size / line-height. */
+.appress-btn__icon-container i {
+	font-size: inherit;
+	color: inherit;
+	line-height: 1;
+}
+
+/* Image icons (Bricks `iconUpload`, custom <img> uploads). */
+.appress-btn__icon-container img {
+	width: 1em;
+	height: 1em;
+	object-fit: contain;
+	display: block;
+}
+
+.appress-btn__label {
+	color: var(--appress-btn-label-color);
+	font-weight: 500;
+	white-space: nowrap;
+}
+
+
+/* All variants inherit the unified base (white bg, light border,
+ * full width, 9px radius). Per-variant blocks live here only when a
+ * variant genuinely needs a different default — currently none do.
+ * The Apple logo's optical-centre nudge is the one exception that
+ * survived the unification. */
+.appress-btn-apple-login .appress-btn__icon { margin-top: -2px; }
+
+

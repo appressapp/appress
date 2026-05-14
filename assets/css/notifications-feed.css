@@ -1,0 +1,292 @@
+/*
+ * Appress Notifications Feed
+ *
+ * Everything is scoped under `.appress-notifications`. All visual tokens
+ * live as CSS variables on the root — themes and child builders (Elementor,
+ * Bricks) override by setting `--appress-notifications-*` on either
+ * `.appress-notifications` or any ancestor scope, e.g.:
+ *
+ *   .my-dark-theme .appress-notifications { --appress-notifications-bg: #111; }
+ *
+ * Layout is flow-based, never fixed-positioned — so the same shortcode lives
+ * happily inside a column, modal, sidebar, or full-width template.
+ */
+
+.appress-notifications {
+	--appress-notifications-gap: 12px;
+	--appress-notifications-radius: 10px;
+	--appress-notifications-border: rgba(17, 24, 39, 0.08);
+	--appress-notifications-bg: #ffffff;
+	--appress-notifications-bg-hover: rgba(17, 24, 39, 0.04);
+	--appress-notifications-bg-unread: rgba(21, 93, 252, 0.06);
+	--appress-notifications-text: #111827;
+	--appress-notifications-muted: #6b7280;
+	--appress-notifications-accent: #155dfc;
+	--appress-notifications-danger: #dc2626;
+	--appress-notifications-max-height: none;
+
+	font-family: inherit;
+	color: var(--appress-notifications-text);
+	font-size: 14px;
+	line-height: 1.5;
+	background: var(--appress-notifications-bg);
+	/* No outer border / radius — the feed sits flush inside whatever page
+	   container the admin drops it into and the sticky header provides
+	   enough visual separation from the body. */
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.appress-notifications *,
+.appress-notifications *::before,
+.appress-notifications *::after {
+	box-sizing: border-box;
+}
+
+/* Browser UA rule `[hidden] { display: none }` loses cascade fights against
+   our `display: flex|block` on __header/__more because both match class
+   specificity — force the attribute to win inside our scope. */
+.appress-notifications [hidden] {
+	display: none !important;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.appress-notifications__header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 10px var(--appress-notifications-gap);
+	background: var(--appress-notifications-bg);
+	border-bottom: 1px solid var(--appress-notifications-border);
+}
+.appress-notifications__title {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--appress-notifications-muted);
+}
+.appress-notifications__actions {
+	display: flex;
+	gap: 6px;
+	margin-left: auto;
+}
+.appress-notifications__btn {
+	background: none;
+	border: 0;
+	padding: 4px 8px;
+	border-radius: 6px;
+	cursor: pointer;
+	/* `em` not `rem` — relative to the feed's own 14px base so Bricks/Astra/
+	   any theme that resets `html { font-size }` can't shrink these to icons. */
+	font-size: 0.9em;
+	font-weight: 500;
+	color: var(--appress-notifications-accent);
+	transition: background 0.15s;
+}
+.appress-notifications__btn:hover {
+	background: var(--appress-notifications-bg-hover);
+}
+.appress-notifications__clear-all {
+	color: var(--appress-notifications-danger);
+}
+
+/* ── List + scroll container ───────────────────────────────────────────── */
+.appress-notifications__list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	max-height: var(--appress-notifications-max-height);
+	overflow-y: auto;
+}
+
+/* ── Item ──────────────────────────────────────────────────────────────── */
+.appress-notifications__item {
+	position: relative;
+	background: transparent;
+	border-bottom: 1px solid var(--appress-notifications-border);
+	transition: background 0.15s;
+}
+.appress-notifications__item:last-child {
+	border-bottom: 0;
+}
+.appress-notifications__item:hover {
+	background: var(--appress-notifications-bg-hover);
+}
+.appress-notifications__item--unread {
+	background: var(--appress-notifications-bg-unread);
+}
+.appress-notifications__item--unread:hover {
+	background: var(--appress-notifications-bg-unread);
+	filter: brightness(0.97);
+}
+
+.appress-notifications__link {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 12px var(--appress-notifications-gap);
+	padding-right: 44px; /* room for the always-visible delete button */
+	text-decoration: none;
+	color: inherit;
+	min-width: 0;
+}
+.appress-notifications__link:focus-visible {
+	outline: 2px solid var(--appress-notifications-accent);
+	outline-offset: -2px;
+	border-radius: 4px;
+}
+
+/* Media cell — image when provided, bell SVG fallback otherwise. Uniform
+   size + shape keeps the list visually aligned regardless of source. */
+.appress-notifications__media {
+	flex: 0 0 44px;
+	width: 44px;
+	height: 44px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	background: var(--appress-notifications-bg-hover);
+}
+.appress-notifications__media img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+}
+.appress-notifications__media--bell {
+	color: var(--appress-notifications-muted);
+}
+.appress-notifications__media--bell svg {
+	width: 22px;
+	height: 22px;
+}
+/* Unread state on the media cell: bell picks up the accent color on a
+   tinted wash so it visibly brightens vs the muted read state; image
+   thumbs get a 2px accent ring so the avatar still reads like a photo
+   but gains the same unread highlight as the bell. Read items keep the
+   default muted look. */
+.appress-notifications__item--unread .appress-notifications__media--bell {
+	background: rgba(21, 93, 252, 0.15);
+	color: var(--appress-notifications-accent);
+}
+.appress-notifications__item--unread .appress-notifications__media--image {
+	box-shadow: 0 0 0 2px var(--appress-notifications-accent);
+}
+.appress-notifications__item--new .appress-notifications__media {
+	animation: appress-notifications-pulse 1.2s ease-out 2;
+}
+@keyframes appress-notifications-pulse {
+	0%   { box-shadow: 0 0 0 0 rgba(21, 93, 252, 0.5); }
+	100% { box-shadow: 0 0 0 10px rgba(21, 93, 252, 0); }
+}
+
+.appress-notifications__content {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+	flex: 1;
+}
+/* All type scales below are `em`-based so they inherit from the feed's own
+   `font-size: 14px` root and don't get crushed by theme-level html resets
+   (Bricks' default is `html { font-size: 62.5% }` → 10px, which would shrink
+   a `0.75rem` timestamp to 7.5px). */
+.appress-notifications__subject {
+	font-weight: 600;
+	font-size: 1em;
+	line-height: 1.3;
+	color: var(--appress-notifications-text);
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+.appress-notifications__body {
+	font-size: 0.9em;
+	line-height: 1.4;
+	color: var(--appress-notifications-muted);
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+.appress-notifications__time {
+	font-size: 0.8em;
+	color: var(--appress-notifications-muted);
+	margin-top: 2px;
+}
+
+
+/* ── Delete button ───────────────────────────────────────────────────────
+   Always visible — opacity-on-hover hid the affordance entirely on touch
+   devices and on first desktop exposure. Users report-ed they "can't
+   delete" because the button was invisible until hover. Fix = make it
+   discoverable from the first render. */
+.appress-notifications__delete {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	width: 28px;
+	height: 28px;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--appress-notifications-muted);
+	cursor: pointer;
+	font-size: 20px;
+	line-height: 1;
+	padding: 0;
+	transition: background 0.15s, color 0.15s;
+	font-family: inherit;
+	z-index: 2;
+}
+.appress-notifications__delete:hover,
+.appress-notifications__delete:focus-visible {
+	background: rgba(220, 38, 38, 0.1);
+	color: var(--appress-notifications-danger);
+}
+
+/* ── Loader / empty / load-more ────────────────────────────────────────── */
+.appress-notifications__loader {
+	padding: 20px var(--appress-notifications-gap);
+	text-align: center;
+	color: var(--appress-notifications-muted);
+	font-size: 13px;
+}
+.appress-notifications__empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 8px;
+	padding: 32px var(--appress-notifications-gap);
+	text-align: center;
+	color: var(--appress-notifications-muted);
+}
+.appress-notifications__empty-icon {
+	width: 48px;
+	height: 48px;
+	opacity: 0.5;
+}
+.appress-notifications__empty-message {
+	font-size: 1rem;
+}
+
+.appress-notifications__more {
+	display: block;
+	width: 100%;
+	padding: 10px var(--appress-notifications-gap);
+	background: none;
+	border: 0;
+	border-top: 1px solid var(--appress-notifications-border);
+	cursor: pointer;
+	color: var(--appress-notifications-accent);
+	font-weight: 500;
+	font-size: 13px;
+	font-family: inherit;
+	transition: background 0.15s;
+}
+.appress-notifications__more:hover {
+	background: var(--appress-notifications-bg-hover);
+}

@@ -1,0 +1,103 @@
+name: Release
+
+# Tag-triggered release builder. Pushing a tag of the form
+# `v1.0.0.7` (4-segment to match the existing APPRESS_VERSION
+# scheme) kicks off a build that:
+#   1. Installs production-only Composer deps into `app/vendor/`.
+#   2. Flips `APPRESS_IS_DEV` from 1 → 0 so customer-site installs
+#      don't carry dev-mode cache-busting + relaxed SSL checks.
+#   3. Zips the plugin folder with the same exclusions the local
+#      manual zip script uses (no `dev/`, no `node_modules/`, no
+#      `CLAUDE.md`, no `.git/`).
+#   4. Publishes a GitHub Release tagged with the pushed tag, with
+#      the zip attached as `appress.zip` — this is the asset name
+#      `yahnis-elsts/plugin-update-checker` pulls via
+#      `enableReleaseAssets()` from `appress.php`.
+#
+# Without the zip asset the update checker falls back to GitHub's
+# auto-generated source archive, which lacks `app/vendor/` →
+# every customer site fatal-errors after auto-update. The
+# `Asset name = appress.zip` step is load-bearing.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*.*'
+
+permissions:
+  contents: write  # Required for softprops/action-gh-release to create a release.
+
+jobs:
+  build:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          tools: composer
+          coverage: none
+
+      - name: Install production Composer dependencies
+        # `--no-dev` strips test-only packages, `--optimize-autoloader`
+        # bakes a classmap for production performance. `--prefer-dist`
+        # avoids cloning each dep's full git history.
+        run: composer install --no-dev --optimize-autoloader --prefer-dist --working-dir=app
+
+      - name: Flip APPRESS_IS_DEV to production
+        # Customer sites must never receive a build with
+        # APPRESS_IS_DEV=1 — that flag relaxes SSL verification and
+        # injects cache-busting timestamps. The local dev plugin
+        # keeps the flag on; this step is the single source of
+        # truth for "release builds are always production-mode".
+        run: |
+          sed -i "s/define( 'APPRESS_IS_DEV', 1 );/define( 'APPRESS_IS_DEV', 0 );/" appress.php
+          grep "APPRESS_IS_DEV" appress.php
+
+      - name: Derive version from tag
+        id: version
+        # GitHub provides `GITHUB_REF_NAME` like `v1.0.0.7`; strip
+        # the leading `v` so downstream steps + the zip filename
+        # match the `APPRESS_VERSION` constant convention.
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build plugin zip
+        # Stage the plugin under `appress/` so unzip on customer
+        # sites lands at `wp-content/plugins/appress/`, NOT
+        # `wp-content/plugins/appress-1.0.0.7/` (which would
+        # deactivate the live plugin).
+        run: |
+          mkdir -p /tmp/staging
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.gitignore' \
+            --exclude '.gemini' \
+            --exclude '.claude' \
+            --exclude '.DS_Store' \
+            --exclude 'node_modules' \
+            --exclude 'dev' \
+            --exclude 'docs' \
+            --exclude 'CLAUDE.md' \
+            --exclude '*.zip' \
+            ./ /tmp/staging/appress/
+          cd /tmp/staging
+          zip -qr "/tmp/appress.zip" appress
+          ls -lh /tmp/appress.zip
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Appress ${{ steps.version.outputs.version }}
+          # Pull release notes from the version's changelog block
+          # in readme.txt. If parsing fails, fall back to the tag
+          # message. Done in a shell command so `softprops` doesn't
+          # have to know about WP readme.txt format.
+          generate_release_notes: true
+          files: /tmp/appress.zip
+          fail_on_unmatched_files: true

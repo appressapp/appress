@@ -1,0 +1,148 @@
+/* Account-deletion widget — wrapper chrome + verify/done screens.
+ *
+ * The single inner button shares `.appress-btn` from
+ * `frontend-commons.css` plus the `.appress-btn-account-deletion`
+ * variant for per-button styling driven by the Elementor / Bricks
+ * Button_Controls_Trait CSS vars.
+ *
+ * Wrapper screens are toggled via the `hidden` attribute (set / unset
+ * by the widget JS). Only one screen is visible at a time.
+ */
+.appress-account-deletion {
+	--appress-acd-gap: 0.75rem;
+}
+.appress-account-deletion__screen {
+	display: flex;
+	flex-direction: column;
+	gap: var(--appress-acd-gap);
+}
+.appress-account-deletion__screen[hidden] {
+	display: none;
+}
+.appress-account-deletion__title {
+	margin: 0;
+	font-size: 1rem;
+	font-weight: 600;
+}
+.appress-account-deletion__description {
+	margin: 0;
+	font-size: 0.875rem;
+	opacity: 0.7;
+	line-height: 1.5;
+}
+.appress-account-deletion__message {
+	margin: 0;
+	font-size: 0.8125rem;
+	line-height: 1.5;
+	opacity: 0.85;
+}
+.appress-account-deletion__message.is-error {
+	color: #ef4444;
+	opacity: 1;
+}
+
+/* OTP input: monospace + wide tracking so the 6 digits read as a code
+ * not a phone number. `letter-spacing` looks off on the first char
+ * without `padding-left` matching the spacing — text stays centred.
+ * `inputmode="numeric"` on the element + `autocomplete="one-time-code"`
+ * (set in PHP) is what triggers iOS / Android numeric keypad + OTP
+ * autofill suggestion. CSS here is just visual polish.
+ */
+.appress-account-deletion__code-input {
+	width: 100%;
+	padding: 0.5rem 0.75rem;
+	font-size: 1.25rem;
+	font-family: -apple-system, BlinkMacSystemFont, "SF Mono", Menlo, monospace;
+	text-align: center;
+	letter-spacing: 0.5em;
+	padding-left: calc(0.75rem + 0.5em); /* offset the trailing tracking */
+	border: 1px solid rgba(0, 0, 0, 0.15);
+	border-radius: 0.5rem;
+	background: #fff;
+	color: inherit;
+	box-sizing: border-box;
+	outline: none;
+	transition: border-color 0.15s ease;
+}
+.appress-account-deletion__code-input::placeholder {
+	color: rgba(0, 0, 0, 0.25);
+	letter-spacing: 0.3em;
+}
+.appress-account-deletion__code-input:focus {
+	border-color: rgba(0, 0, 0, 0.4);
+}
+
+.appress-account-deletion__verify-actions {
+	display: flex;
+	gap: 1rem;
+	justify-content: center;
+	flex-wrap: wrap;
+}
+.appress-account-deletion__link {
+	background: none;
+	border: 0;
+	padding: 0;
+	font: inherit;
+	font-size: 0.875rem;
+	color: inherit;
+	opacity: 0.7;
+	cursor: pointer;
+	text-decoration: underline;
+}
+.appress-account-deletion__link:hover:not(:disabled) {
+	opacity: 1;
+}
+.appress-account-deletion__link:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+	text-decoration: none;
+}
+
+/* Done screen — large green check, calm tone. No "back to site" button
+ * here because the JS auto-redirects to `/` 4 seconds after success.
+ */
+.appress-account-deletion__done-icon {
+	width: 3rem;
+	height: 3rem;
+	border-radius: 9999px;
+	background: rgba(16, 185, 129, 0.1);
+	color: #10b981;
+	font-size: 1.5rem;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin: 0 auto;
+}
+.appress-account-deletion__done-message {
+	margin: 0;
+	font-size: 0.9375rem;
+	text-align: center;
+	line-height: 1.5;
+}
+
+/* Redirecting indicator — surfaces the 4-second pre-redirect pause as
+ * "the app is processing" instead of "the app froze". Spinner is a
+ * pure-CSS rotating donut so we don't ship an SVG / image file for it.
+ */
+.appress-account-deletion__redirecting {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	margin: 0;
+	font-size: 0.8125rem;
+	opacity: 0.65;
+}
+.appress-account-deletion__spinner {
+	width: 0.875rem;
+	height: 0.875rem;
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	border-radius: 50%;
+	display: inline-block;
+	animation: appress-acd-spin 0.7s linear infinite;
+}
+@keyframes appress-acd-spin {
+	to { transform: rotate(360deg); }
+}

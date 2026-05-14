@@ -1,0 +1,145 @@
+/* QR Login feature — modal + scanner-only visibility gate.
+ *
+ * Button styles for the trigger live in `frontend-commons.css` (shared
+ * across every Appress button widget, driven by Button_Controls_Trait).
+ * This file owns ONLY:
+ *   1. The `data-appress-scanner-only` show-on-app-only gate.
+ *   2. The QR modal that the web button pops open.
+ */
+
+/* ─── Scanner-only visibility gate ──────────────────────────────────
+ * `[appress_qr_scanner]` is meaningless outside the app (no camera
+ * bridge in browsers). The button renders `data-appress-scanner-only="1"`
+ * and stays hidden until `qr-login-widget.js` stamps `<html>.appress-in-app`.
+ * Builder canvases pass `data-demo="1"` so admins always see what they
+ * dropped in. */
+[data-appress-scanner-only] { display: none !important; }
+html.appress-in-app [data-appress-scanner-only],
+[data-appress-scanner-only][data-demo="1"] { display: inline-flex !important; }
+
+
+/* ─── QR Login modal ─────────────────────────────────────────────── */
+.appress-qr-login-modal {
+	position: fixed; inset: 0;
+	display: flex; align-items: center; justify-content: center;
+	background: rgba(0,0,0,0.55);
+	z-index: 2147483646;
+	padding: 16px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+	/* Overlay fades in alongside the card slide. Both animations share the
+	 * same 250ms easing window so the backdrop never lags behind the
+	 * panel — visually the sheet "carries" the dim layer up with it. */
+	animation: appress-qr-modal-fade-in 0.25s ease-out;
+}
+.appress-qr-login-modal__card {
+	background: #fff;
+	border-radius: 14px;
+	padding: 24px 24px 20px;
+	max-width: 360px; width: 100%;
+	box-shadow: 0 20px 50px -10px rgba(0,0,0,0.35);
+	color: #111827;
+	text-align: center;
+	/* Slide-up entrance. iOS sheet easing (cubic-bezier .32 .72 0 1) so
+	 * the panel decelerates naturally — feels native rather than the
+	 * default ease-out's slight overshoot. Uses translateY(100%) so the
+	 * card starts entirely below its resting position regardless of
+	 * actual height — works the same on desktop (centered card) and
+	 * mobile (bottom sheet flush to viewport edge). */
+	animation: appress-qr-card-slide-up 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes appress-qr-modal-fade-in {
+	from { background: rgba(0,0,0,0); }
+	to   { background: rgba(0,0,0,0.55); }
+}
+@keyframes appress-qr-card-slide-up {
+	from { transform: translateY(100%); }
+	to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+	/* Honour OS-level "reduce motion" — drop the slide animation but
+	 * keep the fade so the modal still has a perceivable entrance. */
+	.appress-qr-login-modal       { animation: none; }
+	.appress-qr-login-modal__card { animation: none; }
+}
+@media (max-width: 640px) {
+	/* Mobile bottom-sheet: card pinned to viewport bottom, full width,
+	 * only top corners rounded. `align-items: flex-end` parks the card
+	 * at the bottom of the flex container; padding is zeroed so the
+	 * sheet hugs the edges. `padding-bottom: env(safe-area-inset-bottom)`
+	 * inside the card keeps the close button + content above the iOS
+	 * home indicator without forcing a global viewport-fit=cover. */
+	.appress-qr-login-modal {
+		align-items: flex-end;
+		padding: 0;
+	}
+	.appress-qr-login-modal__card {
+		max-width: none;
+		width: 100%;
+		border-radius: 16px 16px 0 0;
+		padding-bottom: calc(20px + env(safe-area-inset-bottom));
+	}
+}
+.appress-qr-login-modal__close {
+	position: absolute; top: 12px; right: 12px;
+	width: 32px; height: 32px;
+	border: 0; background: transparent;
+	color: #6b7280; font-size: 20px; line-height: 1;
+	cursor: pointer; border-radius: 6px;
+}
+.appress-qr-login-modal__close:hover { background: rgba(0,0,0,0.05); color: #111827; }
+.appress-qr-login-modal__title    { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+.appress-qr-login-modal__subtitle { margin: 0 0 20px; font-size: 13px; color: #6b7280; line-height: 1.45; }
+
+.appress-qr-login-modal__qr {
+	margin: 0 auto 16px;
+	width: 280px; height: 280px;
+	border: 1px solid #e5e7eb;
+	border-radius: 10px;
+	padding: 12px;
+	display: flex; align-items: center; justify-content: center;
+	background: #fff;
+	box-sizing: border-box;
+	overflow: hidden;
+}
+/* Render the encoded QR at natural resolution but visually cap to the
+ * box — qrcode-generator emits an <img> with explicit width/height
+ * (~360px), so without these the image overflows and overlaps the
+ * status line. `crisp-edges` keeps module borders sharp on downscale. */
+.appress-qr-login-modal__qr img,
+.appress-qr-login-modal__qr svg {
+	display: block;
+	max-width: 100%;
+	max-height: 100%;
+	width: auto;
+	height: auto;
+	image-rendering: -webkit-optimize-contrast;
+	image-rendering: crisp-edges;
+}
+.appress-qr-login-modal__qr--loading { color: #9ca3af; font-size: 13px; }
+
+.appress-qr-login-modal__status { font-size: 13px; color: #6b7280; margin-top: 12px; min-height: 1.4em; }
+.appress-qr-login-modal__status--success { color: #059669; }
+.appress-qr-login-modal__status--error   { color: #dc2626; }
+
+.appress-qr-login-modal__retry {
+	margin-top: 8px;
+	border: 1px solid #d1d5db;
+	background: #fff;
+	color: #111827;
+	padding: 8px 16px;
+	border-radius: 8px;
+	font-size: 13px; font-weight: 500;
+	cursor: pointer;
+}
+.appress-qr-login-modal__retry:hover { background: #f3f4f6; }
+
+@media (prefers-color-scheme: dark) {
+	.appress-qr-login-modal__card { background: #1f2937; color: #f9fafb; }
+	.appress-qr-login-modal__title { color: #f9fafb; }
+	.appress-qr-login-modal__subtitle, .appress-qr-login-modal__status { color: #9ca3af; }
+	.appress-qr-login-modal__qr { background: #fff; border-color: #374151; }
+	.appress-qr-login-modal__retry { background: #374151; color: #f9fafb; border-color: #4b5563; }
+	.appress-qr-login-modal__retry:hover { background: #4b5563; }
+	.appress-qr-login-modal__close { color: #9ca3af; }
+	.appress-qr-login-modal__close:hover { background: rgba(255,255,255,0.08); color: #f9fafb; }
+}
