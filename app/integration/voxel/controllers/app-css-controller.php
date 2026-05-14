@@ -54,6 +54,9 @@ class App_Css_Controller extends \Appress\Controllers\Base_Controller {
 .ts-popup-root .ts-popup-content-wrapper, .ts-popup-root .ts-field-popup-container > .ts-field-popup{
     max-height: calc(100vh - var(--appress-status-bar-height, 0px)) !important;
 }
+.vx-full-popup .ts-field-popup {
+	top: var(--appress-status-bar-height, 0px) !important;
+}
 CSS;
 
 			case 'android':

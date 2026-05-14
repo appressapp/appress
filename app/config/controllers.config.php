@@ -109,12 +109,6 @@ return [
 	\Appress\Controllers\Notifications\Controller::class,
 	\Appress\Controllers\Notifications\Ajax_Controller::class,
 
-	// Preview app — pairing codes + device tokens + config relay so an
-	// admin can scan a QR from this site inside the Appress Preview
-	// mobile app and see their configured app live before publishing.
-	// Storage: 100% transient-backed (no custom DB table). See ajax-controller.
-	\Appress\Controllers\Preview\Ajax_Controller::class,
-
 	// Biometric Login (Face ID / Touch ID) — token issue + exchange + revoke
 	\Appress\Controllers\Biometric\Database_Controller::class,
 	\Appress\Controllers\Biometric\Ajax_Controller::class,

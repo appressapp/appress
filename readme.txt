@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.8
+Stable tag: 1.0.0.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.9 =
+* Removed the legacy "Preview" tab from the App settings page.
+
 = 1.0.0.8 =
 * Updates: clicking "Check for updates" now installs the new version in a single step instead of a separate confirm-then-install round.
 * Plugins page: added a quick "Updates" link on the Appress row, next to "Onboard".
@@ -186,6 +189,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.9 =
+Removes the legacy Preview tab from the App settings page.
 
 = 1.0.0.8 =
 One-click update flow, quick Plugins-row Updates link, and polish fixes on the Updates tab.
