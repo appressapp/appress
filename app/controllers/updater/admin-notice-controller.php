@@ -84,7 +84,17 @@ class Admin_Notice_Controller extends Base_Controller {
 			return;
 		}
 
-		$updates_url = admin_url( 'admin.php?page=appress-settings&tab=updates' );
+		// One-click WP-native update URL. Same target the
+		// `Update now` link on the Plugins admin page row uses —
+		// hits `update.php?action=upgrade-plugin` which fires
+		// Plugin_Upgrader server-side, runs the same machinery as
+		// our Updates tab without the round-trip through it. Nonce
+		// is bound to the plugin basename so a leaked notice on a
+		// different page can't be replayed against another plugin.
+		$upgrade_url = wp_nonce_url(
+			self_admin_url( 'update.php?action=upgrade-plugin&plugin=' . urlencode( $slug ) ),
+			'upgrade-plugin_' . $slug
+		);
 		?>
 		<div class="notice notice-warning is-dismissible">
 			<p>
@@ -96,8 +106,8 @@ class Admin_Notice_Controller extends Base_Controller {
 					esc_html( $new_version )
 				);
 				?>
-				&nbsp;<a href="<?php echo esc_url( $updates_url ); ?>">
-					<?php esc_html_e( 'Review the update', 'appress' ); ?>
+				&nbsp;<a href="<?php echo esc_url( $upgrade_url ); ?>" class="button button-primary button-small">
+					<?php esc_html_e( 'Update now', 'appress' ); ?>
 				</a>
 			</p>
 		</div>

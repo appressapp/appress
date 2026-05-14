@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.7
+Stable tag: 1.0.0.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,13 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.8 =
+* Updates: clicking "Check for updates" now installs the new version in a single step instead of a separate confirm-then-install round.
+* Plugins page: added a quick "Updates" link on the Appress row, next to "Onboard".
+* The admin-wide update banner now offers a one-click "Update now" button.
+* Rollback dropdown lists every published version (older, current, newer) for explicit reinstall.
+* Fixed: "Latest available" row no longer shows a stray em-dash when the site is already up to date.
+
 = 1.0.0.7 =
 * New: Plugin updates and rollback. Check for new versions, install the latest release, or roll back to a previous version directly from Appress → Settings → Updates.
 * New: Plugin updates show a notice across all admin pages when a new version is available, like other major plugins.
@@ -179,6 +186,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.8 =
+One-click update flow, quick Plugins-row Updates link, and polish fixes on the Updates tab.
 
 = 1.0.0.7 =
 Adds in-dashboard plugin updates and rollback — check, install, or revert versions without leaving WordPress.

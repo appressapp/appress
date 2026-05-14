@@ -67,10 +67,13 @@ jobs:
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
       - name: Build plugin zip
-        # Stage the plugin under `appress/` so unzip on customer
-        # sites lands at `wp-content/plugins/appress/`, NOT
-        # `wp-content/plugins/appress-1.0.0.7/` (which would
-        # deactivate the live plugin).
+        # Stage the plugin under `appress/` (no version suffix) so
+        # unzip on customer sites lands at `wp-content/plugins/appress/`,
+        # NOT `wp-content/plugins/appress-1.0.0.7/` (which would
+        # deactivate the live plugin). The zip FILENAME is versioned
+        # (`appress-{VERSION}.zip`) so the file the user saves to
+        # disk via the download endpoint includes the version — handy
+        # for support reports + manual installs from an archive.
         run: |
           mkdir -p /tmp/staging
           rsync -a \
@@ -87,8 +90,8 @@ jobs:
             --exclude '*.zip' \
             ./ /tmp/staging/appress/
           cd /tmp/staging
-          zip -qr "/tmp/appress.zip" appress
-          ls -lh /tmp/appress.zip
+          zip -qr "/tmp/appress-${{ steps.version.outputs.version }}.zip" appress
+          ls -lh "/tmp/appress-${{ steps.version.outputs.version }}.zip"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -99,5 +102,5 @@ jobs:
           # message. Done in a shell command so `softprops` doesn't
           # have to know about WP readme.txt format.
           generate_release_notes: true
-          files: /tmp/appress.zip
+          files: /tmp/appress-${{ steps.version.outputs.version }}.zip
           fail_on_unmatched_files: true

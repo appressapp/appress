@@ -248,11 +248,19 @@ class Ajax_Controller extends Base_Controller {
 			if ( $tag === '' ) {
 				continue;
 			}
-			// Find the `appress.zip` asset; skip releases missing it.
+			// Find a plugin-zip asset; skip releases missing one.
+			// Matches both the legacy flat name (`appress.zip`) and
+			// the versioned scheme (`appress-1.0.0.8.zip`) the CI
+			// workflow ships going forward. Without the tolerant
+			// matcher, all releases newer than the rename would
+			// silently fall off the dropdown.
 			$zip_url = '';
 			foreach ( (array) ( $rel['assets'] ?? [] ) as $asset ) {
-				if ( isset( $asset['name'], $asset['browser_download_url'] )
-					&& strtolower( (string) $asset['name'] ) === 'appress.zip' ) {
+				if ( ! isset( $asset['name'], $asset['browser_download_url'] ) ) {
+					continue;
+				}
+				$name = strtolower( (string) $asset['name'] );
+				if ( strpos( $name, 'appress' ) === 0 && substr( $name, -4 ) === '.zip' ) {
 					$zip_url = (string) $asset['browser_download_url'];
 					break;
 				}
@@ -273,13 +281,22 @@ class Ajax_Controller extends Base_Controller {
 	}
 
 	/**
-	 * Both endpoints accept the shared `appress_admin_action` nonce
-	 * — same one Settings\Admin_Controller bootstraps into
-	 * `window.appressConfig.nonce`. Centralised so a future signature
-	 * change touches one place.
+	 * Both endpoints accept the shared `appress_admin_action` nonce —
+	 * same one Settings\Admin_Controller bootstraps into
+	 * `window.appressConfig.nonce`. The Vue admin's `postForm` helper
+	 * always sends it as an `X-WP-Nonce` request header (NOT in the
+	 * form body), matching the convention every other Appress admin
+	 * AJAX endpoint already follows (see Settings\Ajax_Controller).
+	 * Body-side `$_POST['nonce']` is kept as a fallback for callers
+	 * that don't use the Vue helper.
 	 */
 	private function verify_admin_nonce(): bool {
-		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		$nonce = '';
+		if ( isset( $_SERVER['HTTP_X_WP_NONCE'] ) ) {
+			$nonce = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_WP_NONCE'] ) );
+		} elseif ( isset( $_POST['nonce'] ) ) {
+			$nonce = sanitize_text_field( wp_unslash( $_POST['nonce'] ) );
+		}
 		return (bool) wp_verify_nonce( $nonce, 'appress_admin_action' );
 	}
 }
