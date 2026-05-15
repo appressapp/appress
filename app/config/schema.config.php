@@ -984,6 +984,24 @@ return [
 					'show_if' => 'android_keystore_file'
 				]
 			],
+			// Play Console anti-squatting verification — Google requires this
+			// when a package name was previously registered, when its domain
+			// is recognised, or when the account is newly flagged. The token
+			// is baked into the APK as `assets/adi-registration.properties`
+			// so a fresh build proves private-key ownership in one upload.
+			// One-time per package; safe to keep filled across rebuilds.
+			'play_console_verification_token' => [
+				'type' => 'text',
+				'label' => __( 'Play Console Verification Token', 'appress' ),
+				'sanitize' => 'text',
+				'default' => '',
+				'ui' => [
+					'group' => 'android_signing',
+					'col_span' => 2,
+					'placeholder' => 'DZCDFK3SVAH4G...',
+					'hint' => __( 'Paste the token from Play Console\'s "Sign and upload an APK" screen. Leave empty unless Google asked you to verify the package name.', 'appress' )
+				]
+			],
 
 			// ── iOS — App Store Connect API Key (required for build signing) ──
 			// Xcode uses this key to fetch/create Development profiles and sign

@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.13
+Stable tag: 1.0.0.14
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.14 =
+* Android Signing: new "Play Console Verification Token" field for the case where Google Play asks you to prove ownership of your package name. Paste the token from Play Console's "Sign and upload an APK" prompt, rebuild your app, and the resulting APK passes the verification on first upload.
+
 = 1.0.0.13 =
 * Build dialog: free plans now see a clear "Upgrade Now" call-to-action with a direct link to manage their plan, plus a "Preview Free" shortcut for trying the app without buying a package.
 * Fixed: cramped spacing on Build dialog headings and helper text caused by WordPress admin styles overriding the modal layout.
@@ -203,6 +206,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.14 =
+Adds a Play Console Verification Token field so you can prove package name ownership when Google Play asks for it on first upload.
 
 = 1.0.0.13 =
 Build dialog adds an Upgrade Now button for free plans and fixes cramped spacing on modal headings.

@@ -970,6 +970,11 @@ class Apps_Controller extends Base_Controller {
 				'android_keystore_password' => $credentials['android_keystore_password'] ?? '',
 				'android_keystore_alias'    => $credentials['android_keystore_alias']    ?? '',
 
+				// Play Console package-name anti-squatting verification.
+				// Engine writes `assets/adi-registration.properties` before
+				// gradle when present. Empty → engine skips, build unchanged.
+				'play_console_verification_token' => $credentials['play_console_verification_token'] ?? '',
+
 				// Google Play auto-publish (premium — consumed if present).
 				'google_play_service_account_json' => $play_sa_b64,
 			];
