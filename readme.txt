@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.14
+Stable tag: 1.0.0.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.15 =
+* Builds tab now shows your app version as "Appress App Version" with a clearer badge on each build row — green when the build uses the latest version, amber when an older one was used. Customer-facing label updated everywhere it was previously shown as a technical term.
+
 = 1.0.0.14 =
 * Android Signing: new "Play Console Verification Token" field for the case where Google Play asks you to prove ownership of your package name. Paste the token from Play Console's "Sign and upload an APK" prompt, rebuild your app, and the resulting APK passes the verification on first upload.
 
@@ -206,6 +209,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.15 =
+Builds tab now labels your app version clearly as "Appress App Version" with a status badge on each build.
 
 = 1.0.0.14 =
 Adds a Play Console Verification Token field so you can prove package name ownership when Google Play asks for it on first upload.
