@@ -34,6 +34,18 @@ class Appress_Menu_Toggle_Element extends \Bricks\Element {
 	}
 
 	public function set_controls() {
+		// Target select — which drawer to toggle. Default 'left' so
+		// pre-2026-05-15 instances keep working unchanged.
+		$this->controls['menu_target'] = [
+			'tab'         => 'content',
+			'label'       => esc_html__( 'Target', 'appress' ),
+			'type'        => 'select',
+			'options'     => [
+				'left'  => esc_html__( 'Left Side Menu',  'appress' ),
+				'right' => esc_html__( 'Right Side Menu', 'appress' ),
+			],
+			'default'     => 'left',
+		];
 		$this->register_button_content_controls( [
 			'has_label'     => true,
 			'has_icon'      => true,
@@ -49,6 +61,7 @@ class Appress_Menu_Toggle_Element extends \Bricks\Element {
 	public function render() {
 		$s    = $this->settings;
 		$html = \Appress\Controllers\Components\Menu_Toggle_Shortcode_Controller::render( [
+			'target'    => isset( $s['menu_target'] ) ? (string) $s['menu_target'] : 'left',
 			'label'     => isset( $s['label'] ) ? (string) $s['label'] : '',
 			'icon_html' => $this->render_selected_icon_html(),
 		] );

@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.15
+Stable tag: 1.0.0.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.16 =
+* Menu Toggle widget now supports a right-side drawer in addition to the left one — set the new Menu Target option to "Right" (Elementor/Bricks) or add `data-appress-menu-target="right"` (shortcode) to wire a button to the right drawer. Existing left-menu buttons keep working with no changes.
+* Fixed: the in-app Back button could appear on the login / first-launch screens and tapping it sometimes led to a "page not found" error. The button now correctly stays hidden on those screens.
+
 = 1.0.0.15 =
 * Builds tab now shows your app version as "Appress App Version" with a clearer badge on each build row — green when the build uses the latest version, amber when an older one was used. Customer-facing label updated everywhere it was previously shown as a technical term.
 
@@ -209,6 +213,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.16 =
+Adds right-side menu drawer support to the Menu Toggle widget and fixes a stray Back button on the login screen that could lead to a 404.
 
 = 1.0.0.15 =
 Builds tab now labels your app version clearly as "Appress App Version" with a status badge on each build.

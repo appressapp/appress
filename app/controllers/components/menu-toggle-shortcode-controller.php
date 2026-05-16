@@ -45,6 +45,9 @@ class Menu_Toggle_Shortcode_Controller extends Base_Controller {
 
 	/**
 	 * Supported $atts:
+	 *   - target       (left|right) Which drawer to toggle. Default 'left' so
+	 *                  shortcodes embedded before the 2026-05-15 two-drawer
+	 *                  feature keep their original single-drawer behavior.
 	 *   - label        (string) Optional text next to the icon. Empty = icon only.
 	 *   - class        (string) Extra wrapper class(es).
 	 *   - icon_html    (string) Custom icon HTML pass-through. Empty falls back to hamburger.
@@ -53,6 +56,7 @@ class Menu_Toggle_Shortcode_Controller extends Base_Controller {
 	 */
 	public static function render( $atts = [] ) {
 		$atts = shortcode_atts( [
+			'target'       => 'left',
 			'label'        => '',
 			'class'        => '',
 			'icon_html'    => '',
@@ -60,18 +64,20 @@ class Menu_Toggle_Shortcode_Controller extends Base_Controller {
 			'inline_style' => '',
 		], (array) $atts, 'appress_menu_toggle' );
 
+		$target      = strtolower( (string) $atts['target'] ) === 'right' ? 'right' : 'left';
 		$label       = (string) $atts['label'];
 		$extra_class = ! empty( $atts['class'] ) ? ' ' . sanitize_html_class( $atts['class'] ) : '';
-		// `appress-open-menu` is the native-side click interceptor selector
-		// (slave JS bundle) — keeping it on the wrapper means clicks fire
-		// even if `menu-toggle-widget.js` hasn't run yet (e.g. early-tap
-		// race during page load).
+		// `appress-open-menu` / `appress-open-right-menu` is the native-side
+		// click interceptor selector (slave JS bundle) — keeping it on the
+		// wrapper means clicks fire even if `menu-toggle-widget.js` hasn't
+		// run yet (e.g. early-tap race during page load).
+		$intercept_class = $target === 'right' ? 'appress-open-right-menu' : 'appress-open-menu';
 		$root_class  = 'appress-btn'
 			. ' ' . self::VARIANT_CLASS
 			. ' ' . self::TRIGGER_CLASS
-			. ' appress-open-menu'
+			. ' ' . $intercept_class
 			. $extra_class;
-		$aria_label  = $label !== '' ? $label : __( 'Menu', 'appress' );
+		$aria_label  = $label !== '' ? $label : ( $target === 'right' ? __( 'Open right menu', 'appress' ) : __( 'Menu', 'appress' ) );
 		$icon_html   = $atts['icon_html'] !== '' ? $atts['icon_html'] : self::default_icon_svg();
 		$style_attr  = $atts['inline_style'] !== '' ? ' style="' . esc_attr( $atts['inline_style'] ) . '"' : '';
 
@@ -80,7 +86,7 @@ class Menu_Toggle_Shortcode_Controller extends Base_Controller {
 
 		ob_start();
 		?>
-		<button type="button" class="<?php echo esc_attr( $root_class ); ?>" data-appress-menu-toggle aria-label="<?php echo esc_attr( $aria_label ); ?>"<?php echo $style_attr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
+		<button type="button" class="<?php echo esc_attr( $root_class ); ?>" data-appress-menu-toggle data-appress-menu-target="<?php echo esc_attr( $target ); ?>" aria-label="<?php echo esc_attr( $aria_label ); ?>"<?php echo $style_attr; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>>
 			<span class="appress-btn__icon-container">
 				<?php echo $icon_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</span>

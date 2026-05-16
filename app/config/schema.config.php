@@ -279,6 +279,12 @@ return [
 							'type' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'screen' ],
 							'screen_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 							'url' => [ 'type' => 'url', 'sanitize' => 'url', 'default' => '' ],
+							// Which drawer this item opens when type === 'menu_toggle'.
+							// 'left'  → opens the Left Side Menu  (action: open_side_menu)
+							// 'right' → opens the Right Side Menu (action: open_right_menu)
+							// Default 'left' so items configured before 2026-05-15 keep
+							// their original single-drawer behavior.
+							'menu_target' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'left' ],
 							'indicator' => [ 'type' => 'select', 'sanitize' => 'text', 'default' => 'none' ],
 							// Per-item indicator override — lets customer tone
 							// down less-critical badges (e.g. cart = subtle
@@ -346,39 +352,55 @@ return [
 				'default' => '',
 				'ui' => [ 'group' => 'analytics', 'placeholder' => "G-WEB_ONE\nG-WEB_TWO", 'hint' => __( 'One ID per line. Only used when the switch above is OFF.', 'appress' ), 'show_if' => '!exclude_all_web_ga' ]
 			],
-			// Side Menu — slide-in drawer loading the App Screen marked with
-			// role="menu". WebView approach: customer designs the menu on
-			// their site (user profile, avatar, account links, conditional
-			// content based on login state) on a screen, marks it with the
-			// "Menu Screen" role, and the drawer reuses that screen's URL
-			// + reload behavior. Drawer pushes the whole app layout
-			// sideways (bottom nav included) so it reveals cleanly.
-			// Triggered by: edge swipe, bottom nav item with type=menu_toggle,
-			// or any element with class `.appress-open-menu` inside the web
-			// content (intercepted by the native bridge JS).
+			// ────────────────────────────────────────────────────────────────
+			//   LEFT SIDE MENU
+			//   Internal field name kept as `side_menu` for backward compat
+			//   with apps shipped before 2026-05-15 when this was the only
+			//   drawer. Always anchored to the LEFT edge.
+			// ────────────────────────────────────────────────────────────────
+			// Slide-in drawer loading the App Screen marked with role="menu".
+			// WebView approach: customer designs the menu on their site (user
+			// profile, avatar, account links, conditional content based on
+			// login state) on a screen, marks it with the "Menu Screen" role,
+			// and the drawer reuses that screen's URL + reload behavior. Drawer
+			// pushes the whole app layout sideways (bottom nav included) so it
+			// reveals cleanly. Triggered by: edge swipe, bottom nav item with
+			// type=menu_toggle, or any element with class `.appress-open-menu`
+			// inside the web content (intercepted by the native bridge JS).
 			'side_menu' => [
 				'type' => 'object',
-				'label' => __( 'Side Menu', 'appress' ),
+				'label' => __( 'Left Side Menu', 'appress' ),
 				'sanitize' => 'object',
 				'default' => [],
 				'fields' => [
-					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Enable Side Menu', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'hint' => __( 'Drawer content comes from the App Screen marked with the "Menu Screen" role. Set the role on that screen below.', 'appress' ) ] ],
-					'width_percent' => [ 'type' => 'number', 'label' => __( 'Width (% of screen)', 'appress' ), 'sanitize' => 'number', 'default' => 90, 'ui' => [ 'group' => 'side_menu_main', 'placeholder' => '90', 'show_if' => 'enabled' ] ],
-					'position' => [
-						'type' => 'select',
-						'label' => __( 'Open From', 'appress' ),
-						'sanitize' => 'text',
-						'default' => 'left',
-						'ui' => [
-							'group' => 'side_menu_main',
-							'show_if' => 'enabled',
-							'options' => [
-								[ 'value' => 'left',  'label' => 'Left' ],
-								[ 'value' => 'right', 'label' => 'Right' ],
-							]
-						]
-					],
-					'background_color' => [ 'type' => 'color', 'label' => __( 'Background color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'side_menu_main', 'show_if' => 'enabled' ] ],
+					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Enable Left Side Menu', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'hint' => __( 'Drawer content comes from the App Screen marked with the "Left Menu Screen" role. Set the role on that screen below.', 'appress' ) ] ],
+					'width_percent' => [ 'type' => 'number', 'label' => __( 'Width (% of screen)', 'appress' ), 'sanitize' => 'number', 'default' => 90, 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'placeholder' => '90', 'show_if' => 'enabled' ] ],
+					'background_color' => [ 'type' => 'color', 'label' => __( 'Background color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'show_if' => 'enabled' ] ],
+				]
+			],
+
+			// ────────────────────────────────────────────────────────────────
+			//   RIGHT SIDE MENU (added 2026-05-15)
+			// ────────────────────────────────────────────────────────────────
+			// Optional second drawer anchored on the right edge. Use case:
+			// separate user-account context (profile, messages, notifications,
+			// logout) from site navigation (categories, pages) — common pattern
+			// in messaging / social apps. Mirrors `side_menu` config minus the
+			// `position` field (always anchored right).
+			//
+			// Default disabled — apps shipped before 2026-05-15 will keep their
+			// single-menu behavior. Schema is additive, so payloads from older
+			// engines (no `right_menu` key) flow through harmlessly and the
+			// mobile-app code feature-detects this field's presence.
+			'right_menu' => [
+				'type' => 'object',
+				'label' => __( 'Right Side Menu', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [],
+				'fields' => [
+					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Enable Right Side Menu', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'right_menu_main', 'col_span' => 2, 'hint' => __( 'Drawer content comes from the App Screen marked with the "Right Menu Screen" role. Set the role on that screen below.', 'appress' ) ] ],
+					'width_percent' => [ 'type' => 'number', 'label' => __( 'Width (% of screen)', 'appress' ), 'sanitize' => 'number', 'default' => 90, 'ui' => [ 'group' => 'right_menu_main', 'col_span' => 2, 'placeholder' => '90', 'show_if' => 'enabled' ] ],
+					'background_color' => [ 'type' => 'color', 'label' => __( 'Background color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'right_menu_main', 'col_span' => 2, 'show_if' => 'enabled' ] ],
 				]
 			],
 
@@ -661,7 +683,13 @@ return [
 								[ 'value' => 'home',          'label' => __( 'Homescreen',          'appress' ) ],
 								[ 'value' => 'auth',          'label' => __( 'Auth Screen',         'appress' ) ],
 								[ 'value' => 'notifications', 'label' => __( 'Notification Screen', 'appress' ) ],
-								[ 'value' => 'menu',          'label' => __( 'Menu Screen',         'appress' ) ],
+								// Backward compat: "Menu Screen" is the LEFT side menu's
+								// content source. Pre-2026-05-15 this was simply "the menu".
+								[ 'value' => 'menu',          'label' => __( 'Left Menu Screen',    'appress' ) ],
+								// Added 2026-05-15 for the optional right-side drawer.
+								// Apps that never enable `right_menu` ignore this role
+								// → backward compat preserved.
+								[ 'value' => 'right_menu',    'label' => __( 'Right Menu Screen',   'appress' ) ],
 							]
 						]
 					],

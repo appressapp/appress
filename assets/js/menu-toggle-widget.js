@@ -3,15 +3,22 @@
  *
  * Wires every `[data-appress-menu-toggle]` root rendered on the page.
  *
- * Click behaviour:
- *   - `window.Appress.backButtonContext === 'menu'` (button placed inside
- *     the side menu's own WebView) → post `close_side_menu` to native.
- *   - Anywhere else (tab / subscreen / unknown ctx) → post `open_side_menu`.
+ * Target menu (added 2026-05-15 for two-drawer apps):
+ *   - `data-appress-menu-target="left"`  (default) → controls the LEFT drawer
+ *   - `data-appress-menu-target="right"`           → controls the RIGHT drawer
  *
- * The wrapper element also carries the `.appress-open-menu` class so the
- * slave JS link-interceptor opens the menu even when this widget JS
- * hasn't bound yet (covers tap-during-load race). The two paths are
- * idempotent on the native side — one wins, the other no-ops.
+ * Click behaviour:
+ *   - If the button is INSIDE the matching drawer's own WebView
+ *     (`window.Appress.backButtonContext === 'menu'` for left,
+ *     `=== 'right_menu'` for right) → post the close event for that drawer.
+ *   - Anywhere else (tab / subscreen / unknown ctx) → post the open event
+ *     for the target drawer.
+ *
+ * The wrapper element also carries `.appress-open-menu` or
+ * `.appress-open-right-menu` class so the slave JS link-interceptor still
+ * opens the correct drawer even when this widget JS hasn't bound yet
+ * (covers tap-during-load race). The two paths are idempotent on the
+ * native side — one wins, the other no-ops.
  */
 (function () {
 	function postNative(type) {
@@ -39,15 +46,35 @@
 			: null;
 	}
 
+	function targetOf(root) {
+		// 'left' (default) | 'right'. Anything else falls back to 'left' so
+		// pre-2026-05-15 markup without the attribute keeps working.
+		var raw = (root.getAttribute('data-appress-menu-target') || '').toLowerCase();
+		return raw === 'right' ? 'right' : 'left';
+	}
+
 	function onClick(evt) {
+		var root = evt.currentTarget;
 		evt.preventDefault();
 		evt.stopPropagation();
-		var ctx = getContext();
-		if (ctx === 'menu') {
+
+		var target = targetOf(root);
+		var ctx    = getContext();
+
+		// Same-drawer toggle: button placed INSIDE the drawer's WebView
+		// acts as a close button. Cross-drawer (left button inside right
+		// menu, or vice-versa) still opens — useful for "switch drawer"
+		// flows where the user taps a button in the right menu that
+		// opens the left, etc.
+		if (target === 'left' && ctx === 'menu') {
 			postNative('close_side_menu');
-		} else {
-			postNative('open_side_menu');
+			return;
 		}
+		if (target === 'right' && ctx === 'right_menu') {
+			postNative('close_right_menu');
+			return;
+		}
+		postNative(target === 'right' ? 'open_right_menu' : 'open_side_menu');
 	}
 
 	function wire(root) {

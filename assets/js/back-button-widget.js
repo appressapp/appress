@@ -76,11 +76,21 @@
 	}
 
 	function shouldShow() {
+		// `master` context is checked BEFORE the history-first short-
+		// circuit because master pages (auth gate, first launch) can
+		// legitimately have history.length > 1 from a Capacitor
+		// scaffold → auth URL redirect chain, but `history.back()`
+		// there walks into the Capacitor stub (404) or a previous
+		// auth-step page the user can't legally return to. Native
+		// injects this context at documentStart on every master
+		// navigation so the button never appears on pages where back-
+		// nav has no valid destination.
+		var ctx = getContext();
+		if (ctx === 'master') return false;
 		// History-first: button is meaningful whenever back-nav has a
 		// real target. The context-based close is the fallback only.
 		if (canGoBackInHistory()) return true;
-		var ctx = getContext();
-		if (ctx === 'menu' || ctx === 'subscreen') return true;
+		if (ctx === 'menu' || ctx === 'right_menu' || ctx === 'subscreen') return true;
 		if (ctx === 'tab') return false;
 		// Legacy/browser fallback (no native context marker) — keep
 		// visible so old subscreen-only flows still work.
@@ -88,8 +98,9 @@
 	}
 
 	function fallbackClose(ctx) {
-		if (ctx === 'menu') { postNative('close_side_menu'); return; }
-		if (ctx === 'subscreen') { postNative('pop_standalone'); return; }
+		if (ctx === 'menu')       { postNative('close_side_menu');  return; }
+		if (ctx === 'right_menu') { postNative('close_right_menu'); return; }
+		if (ctx === 'subscreen')  { postNative('pop_standalone');   return; }
 		if (ctx === 'tab') { return; }
 		// Legacy null context — pop_standalone, native no-ops if stack
 		// is empty.

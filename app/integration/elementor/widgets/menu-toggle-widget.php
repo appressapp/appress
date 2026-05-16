@@ -35,6 +35,23 @@ class Menu_Toggle_Widget extends \Elementor\Widget_Base {
 	}
 
 	protected function register_controls() {
+		// Target select — separate section above the Content section so the
+		// drawer choice is the first thing the editor sees.
+		$this->start_controls_section( 'appress_menu_target_section', [
+			'label' => __( 'Menu', 'appress' ),
+			'tab'   => \Elementor\Controls_Manager::TAB_CONTENT,
+		] );
+		$this->add_control( 'menu_target', [
+			'label'   => __( 'Target', 'appress' ),
+			'type'    => \Elementor\Controls_Manager::SELECT,
+			'default' => 'left',
+			'options' => [
+				'left'  => __( 'Left Side Menu',  'appress' ),
+				'right' => __( 'Right Side Menu', 'appress' ),
+			],
+		] );
+		$this->end_controls_section();
+
 		$this->register_button_content_section( [
 			'has_label'     => true,
 			'has_icon'      => true,
@@ -51,6 +68,7 @@ class Menu_Toggle_Widget extends \Elementor\Widget_Base {
 		$s = $this->get_settings_for_display();
 		// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo \Appress\Controllers\Components\Menu_Toggle_Shortcode_Controller::render( [
+			'target'    => isset( $s['menu_target'] ) ? (string) $s['menu_target'] : 'left',
 			'label'     => isset( $s['label'] ) ? (string) $s['label'] : '',
 			'icon_html' => $this->render_selected_icon_html(),
 		] );
