@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.16
+Stable tag: 1.0.0.17
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.17 =
+* Failed builds are now clearly marked in red on the Builds tab, with a small info icon next to the status. Click the icon to see exactly what went wrong (for example, "iOS Signing values look incorrect — please double-check Build Information or contact support").
+* Removed the "Try again" button on failed builds. To rebuild after fixing the cause, use the regular "Build now" button at the top of the app page — it creates a fresh build and is the same path you used to start the original one.
+
 = 1.0.0.16 =
 * Menu Toggle widget now supports a right-side drawer in addition to the left one — set the new Menu Target option to "Right" (Elementor/Bricks) or add `data-appress-menu-target="right"` (shortcode) to wire a button to the right drawer. Existing left-menu buttons keep working with no changes.
 * Fixed: the in-app Back button could appear on the login / first-launch screens and tapping it sometimes led to a "page not found" error. The button now correctly stays hidden on those screens.
@@ -213,6 +217,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.17 =
+Failed builds now show a clear red status with a clickable info icon explaining what went wrong. The Try again button is removed — use Build now to retry after fixing the cause.
 
 = 1.0.0.16 =
 Adds right-side menu drawer support to the Menu Toggle widget and fixes a stray Back button on the login screen that could lead to a 404.

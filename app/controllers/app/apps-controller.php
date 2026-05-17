@@ -39,7 +39,6 @@ class Apps_Controller extends Base_Controller {
 		$this->on( 'appress_ajax_app.request_build', '@request_build' );
 		$this->on( 'appress_ajax_app.get_builds', '@get_builds' );
 		$this->on( 'appress_ajax_app.download_build', '@download_build' );
-		$this->on( 'appress_ajax_app.retry_build', '@retry_build' );
 		$this->on( 'appress_ajax_app.get_plan', '@get_plan' );
 		$this->on( 'appress_ajax_app.testflight_submit', '@submit_testflight' );
 		$this->on( 'appress_ajax_app.playstore_publish', '@publish_playstore' );
@@ -1057,54 +1056,6 @@ class Apps_Controller extends Base_Controller {
 						? $local_base . '&app_id=' . $post_id . '&build_id=' . $b['id'] . '&os=ios&_wpnonce=' . $dl_nonce
 						: '';
 				}
-			}
-
-			return wp_send_json( $body );
-		} catch ( \Exception $e ) {
-			return wp_send_json( [ 'success' => false, 'message' => $e->getMessage() ] );
-		}
-	}
-
-	protected function retry_build() {
-		try {
-			$this->check_permissions();
-
-			$central_url = defined( 'APPRESS_CENTRAL_URL' ) ? APPRESS_CENTRAL_URL : '';
-			if ( empty( $central_url ) ) {
-				throw new \Exception( esc_html__( 'Central URL not defined.', 'appress' ) );
-			}
-
-			$proxy_body = [
-				'connection_token' => sanitize_text_field( wp_unslash( $_POST['connection_token'] ?? '' ) ),
-				'post_id'          => intval( $_POST['post_id'] ?? 0 ),
-				'build_id'         => intval( $_POST['build_id'] ?? 0 ),
-			];
-
-			$response = wp_remote_post( $central_url . '/?my_appress=1&action=build.retry', [
-				'body'      => $proxy_body,
-				'timeout'   => 15,
-				'sslverify' => ! ( defined( 'APPRESS_IS_DEV' ) && \APPRESS_IS_DEV )
-			] );
-
-			if ( is_wp_error( $response ) ) {
-    /* translators: dynamic value injected into the message */
-				throw new \Exception( esc_html( sprintf( __( 'Central SaaS unreachable: %s', 'appress' ), $response->get_error_message() ) ) );
-			} 
-
-			$raw_body  = wp_remote_retrieve_body( $response );
-			$http_code = wp_remote_retrieve_response_code( $response );
-			$body      = json_decode( $raw_body, true );
-			if ( json_last_error() !== JSON_ERROR_NONE ) {
-				// Log internally only — never expose raw Central response to client
-				if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-					error_log( 'Appress Central invalid response (HTTP ' . $http_code . '): ' . substr( $raw_body, 0, 1000 ) );
-				}
-				/* translators: %d: HTTP status code */
-				throw new \Exception( esc_html( sprintf( __( 'Build server returned an unexpected response (HTTP %d).', 'appress' ), $http_code ) ) );
-			}
-
-			if ( ! isset( $body['success'] ) ) {
-				throw new \Exception( esc_html__( 'Invalid response structure from Central SaaS.', 'appress' ) );
 			}
 
 			return wp_send_json( $body );
