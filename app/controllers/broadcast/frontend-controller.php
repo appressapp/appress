@@ -21,9 +21,10 @@ class Frontend_Controller extends \Appress\Controllers\Base_Controller {
 	const SIGNATURE_TS_TOLERANCE = 300;
 
 	protected function hooks() {
-		// Native App endpoint to track notification taps
-		$this->on( 'appress_ajax_nopriv_app.broadcast.track_read', '@handle_track_read' );
-		$this->on( 'appress_ajax_app.broadcast.track_read', '@handle_track_read' );
+		// Mobile-only — native app reports a notification tap. Register on
+		// each app's `<class_id>_ajax_*` + legacy `appress_ajax_*` for
+		// backward compat.
+		$this->on_mobile( 'app.broadcast.track_read', '@handle_track_read' );
 	}
 
 	protected function handle_track_read() {

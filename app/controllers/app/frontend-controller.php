@@ -31,8 +31,10 @@ class Frontend_Controller extends Base_Controller
 
 	protected function hooks()
 	{
-		$this->on('appress_ajax_nopriv_app.boot', '@handle_boot');
-		$this->on('appress_ajax_app.boot', '@handle_boot');
+		// Mobile-only — first request a freshly-installed app fires to
+		// pull its native config. Register on each app's `<class_id>_ajax_*`
+		// + legacy `appress_ajax_*` for backward compat.
+		$this->on_mobile( 'app.boot', '@handle_boot' );
 
 		// First-install detection on login from inside the app. Covers BOTH paths:
 		// (a) user opens app → logs in for the first time (UA = Appress/{appId}).

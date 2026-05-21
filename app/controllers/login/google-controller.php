@@ -26,9 +26,10 @@ class Google_Controller extends \Appress\Controllers\Base_Controller {
 	// }
 
 	protected function hooks() {
-		// Use Appress's custom fast-router endpoint instead of admin-ajax.php.
-		$this->on( 'appress_ajax_auth.google.login', '@handle_login' );
-		$this->on( 'appress_ajax_nopriv_auth.google.login', '@handle_login' );
+		// Mobile-only endpoint — register on each app's `<class_id>_ajax_*`
+		// prefix for new builds + the legacy `appress_ajax_*` prefix as
+		// backward compat for mobile apps shipped before unique_class.
+		$this->on_mobile( 'auth.google.login', '@handle_login' );
 
 		// `wp_enqueue_scripts` runs before `wp_print_footer_scripts` (priority
 		// 20 on `wp_footer`), so the bridge handle gets flushed into the

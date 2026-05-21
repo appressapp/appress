@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.17
+Stable tag: 1.0.0.18
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,15 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.18 =
+* New "Native Features" panel on the app settings page lets admins toggle which native frameworks ship with the build — Push Notifications, Biometric (Face ID / Touch ID), Google Sign-In, Sign in with Apple, QR Scanner, and Geolocation. Turning a feature off removes the related SDK from the binary and skips its permission prompt, giving a smaller download size and a cleaner data-safety disclosure on the App Store / Play Store.
+* Each toggle in Native Features now has a small info icon that opens the matching documentation page on docs.appress.app for setup steps and platform-specific notes.
+* Every newly built app now ships with a completely unique internal fingerprint — different identifiers, request signatures, and log markers from every other Appress-built app — so the App Store no longer flags your customers' submissions as similar to other apps.
+* The User-Agent each app sends to your website now carries the app's own identifier instead of a shared brand string, making access logs and analytics cleanly distinguish traffic between different apps.
+* Push notifications now display the app's own name in the device's Notifications settings instead of a generic label.
+* Fixed a database migration that previously ran only on wp-admin requests — the new column now lands on plugin load regardless of where the first request comes from, so frontend traffic no longer hits "unknown column" errors right after upgrading.
+* Fixed the biometric AJAX endpoints (issue_token / exchange / revoke) failing to register on some installs.
+
 = 1.0.0.17 =
 * Failed builds are now clearly marked in red on the Builds tab, with a small info icon next to the status. Click the icon to see exactly what went wrong (for example, "iOS Signing values look incorrect — please double-check Build Information or contact support").
 * Removed the "Try again" button on failed builds. To rebuild after fixing the cause, use the regular "Build now" button at the top of the app page — it creates a fresh build and is the same path you used to start the original one.
@@ -217,6 +226,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.18 =
+Adds the Native Features panel to bundle only the SDKs each app actually uses, gives every new build a unique fingerprint so the App Store stops flagging similar apps, and ships push notifications under the app's own name.
 
 = 1.0.0.17 =
 Failed builds now show a clear red status with a clickable info icon explaining what went wrong. The Try again button is removed — use Build now to retry after fixing the cause.

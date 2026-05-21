@@ -194,6 +194,140 @@ return [
 					],
 				]
 			],
+
+			// ── Native Features ─────────────────────────────────────────────
+			// Per-feature build-time toggles. Each one decides whether the
+			// related Capacitor plugin + native framework gets bundled into
+			// the .ipa / .apk. Disabling a feature shrinks binary size AND
+			// makes each customer's linked-frameworks signature different —
+			// helps with Apple's 4.3(a) similarity scanner that flags apps
+			// sharing the same Capacitor + framework fingerprint across
+			// developer accounts.
+			//
+			// Default ON for every feature so existing apps keep current
+			// behavior on plugin upgrade. Customer opts OFF per app, per
+			// build. Engine reads `<feature>.enabled` flag from build_payload
+			// and conditionally includes the plugin in `npm install` + the
+			// native code injection step.
+			//
+			// Mirror of the admob pattern: each feature is its own object
+			// with an `enabled` field today + room to add per-feature
+			// configuration (provider tokens, permission strings, etc.) later.
+
+			'push_notifications' => [
+				'type' => 'object',
+				'label' => __( 'Push Notifications', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Enable Push Notifications', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'doc_url' => 'https://docs.appress.app/native-features/push-notifications'
+						]
+					],
+				]
+			],
+
+			'biometric' => [
+				'type' => 'object',
+				'label' => __( 'Biometric Authentication', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Enable Biometric (Face ID / Touch ID)', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'doc_url' => 'https://docs.appress.app/native-features/biometric'
+						]
+					],
+				]
+			],
+
+			'google_auth' => [
+				'type' => 'object',
+				'label' => __( 'Google Sign-In', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Enable Google Sign-In', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'doc_url' => 'https://docs.appress.app/native-features/google-sign-in'
+						]
+					],
+				]
+			],
+
+			'apple_auth' => [
+				'type' => 'object',
+				'label' => __( 'Sign in with Apple', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Enable Sign in with Apple', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'doc_url' => 'https://docs.appress.app/native-features/sign-in-with-apple'
+						]
+					],
+				]
+			],
+
+			'qr_scanner' => [
+				'type' => 'object',
+				'label' => __( 'QR Code Scanner', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Enable QR Scanner', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'doc_url' => 'https://docs.appress.app/native-features/qr-scanner'
+						]
+					],
+				]
+			],
+
+			'geolocation' => [
+				'type' => 'object',
+				'label' => __( 'Geolocation', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Enable Geolocation', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'doc_url' => 'https://docs.appress.app/native-features/geolocation'
+						]
+					],
+				]
+			],
+
 			// connection_token + central_app_id intentionally NOT declared
 			// here. They live in their own DB columns (connection_token is
 			// encrypted). Declaring them would also duplicate the values

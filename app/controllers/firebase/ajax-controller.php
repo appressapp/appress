@@ -49,8 +49,9 @@ class Ajax_Controller extends \Appress\Controllers\Base_Controller {
 	 * database.
 	 */
 	protected function hooks() {
-		$this->on( 'appress_ajax_firebase.sync_token', '@handle_sync_token' );
-		$this->on( 'appress_ajax_nopriv_firebase.sync_token', '@handle_sync_token' );
+		// Mobile-only — native FCM token sync. Register on each app's
+		// `<class_id>_ajax_*` prefix + legacy `appress_ajax_*`.
+		$this->on_mobile( 'firebase.sync_token', '@handle_sync_token' );
 	}
 
 	protected function handle_sync_token() {

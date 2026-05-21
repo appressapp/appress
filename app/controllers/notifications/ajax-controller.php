@@ -54,11 +54,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Ajax_Controller extends \Appress\Controllers\Base_Controller {
 
 	protected function hooks() {
+		// Mobile-only — in-app notification feed list + read/delete actions.
+		// Register on each app's `<class_id>_ajax_*` + legacy `appress_ajax_*`
+		// for backward compat. nopriv stays exposed via on_mobile so the
+		// list endpoint keeps working for un-authed (anonymous app users
+		// looking at a public feed) — the mutating handlers themselves
+		// enforce the auth check.
 		$endpoints = [ 'list', 'mark_read', 'mark_all_read', 'delete', 'delete_all' ];
 		foreach ( $endpoints as $ep ) {
-			$method = '@handle_' . $ep;
-			$this->on( "appress_ajax_notifications.{$ep}",        $method );
-			$this->on( "appress_ajax_nopriv_notifications.{$ep}", $method );
+			$this->on_mobile( "notifications.{$ep}", '@handle_' . $ep );
 		}
 
 		// Built-in DB source registered at priority 5 so integrations that

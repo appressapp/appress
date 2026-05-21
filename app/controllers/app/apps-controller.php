@@ -74,6 +74,11 @@ class Apps_Controller extends Base_Controller {
 			$table = $wpdb->prefix . 'appress_apps';
 			$wpdb->delete( $table, [ 'id' => $app_id ] );
 
+			// Drop the unique_class lookup cache so the AJAX router stops
+			// accepting `?<deleted_class>=1` immediately on the next request
+			// (otherwise the stale entry lingers until process restart).
+			\Appress\clear_apps_class_cache();
+
 			return wp_send_json( [
 				'success' => true,
 				'message' => 'App deleted successfully.'
@@ -125,6 +130,12 @@ class Apps_Controller extends Base_Controller {
 		}
 		if ( isset( $db_row['central_app_id'] ) ) {
 			$hydrated['central_app_id'] = $db_row['central_app_id'];
+		}
+		// Central-derived per-app identifier — null until first app.connect /
+		// refresh_essentials populates it. Vue read-only displays this for
+		// debugging / support visibility.
+		if ( isset( $db_row['unique_class'] ) ) {
+			$hydrated['unique_class'] = $db_row['unique_class'];
 		}
 
 		return $hydrated;
@@ -800,6 +811,16 @@ class Apps_Controller extends Base_Controller {
 
 				$signing_secret = isset( $body['data']['signing_secret'] ) ? sanitize_text_field( $body['data']['signing_secret'] ) : '';
 
+				// unique_class is Central-derived (deterministic from package_id) and
+				// gets persisted to its own DB column for fast lookup. Validate format
+				// before accepting — must be "X" followed by hex chars (Swift/Java
+				// identifier-safe). Empty string is acceptable: a Central running an
+				// older version of the plugin won't include the field; the lazy
+				// backfill on the Central side will populate it on the next
+				// app.connect / app.update_config round-trip.
+				$unique_class_raw = isset( $body['data']['unique_class'] ) ? sanitize_text_field( $body['data']['unique_class'] ) : '';
+				$unique_class = preg_match( '/^X[a-f0-9]{8,32}$/', $unique_class_raw ) === 1 ? $unique_class_raw : '';
+
 				// Existing-row lookup by central_app_id. The duplicate-token
 				// guard above already rejected exact-token re-link, so any
 				// row we find here was previously linked with a DIFFERENT
@@ -839,7 +860,14 @@ class Apps_Controller extends Base_Controller {
 					if ( $signing_secret !== '' ) {
 						$update_payload['signing_secret'] = \Appress\encrypt( $signing_secret );
 					}
+					if ( $unique_class !== '' ) {
+						$update_payload['unique_class'] = $unique_class;
+					}
 					$wpdb->update( $table, $update_payload, [ 'id' => intval( $existing_row['id'] ) ] );
+
+					if ( $unique_class !== '' ) {
+						\Appress\clear_apps_class_cache();
+					}
 
 					return wp_send_json( [
 						'success' => true,
@@ -856,10 +884,15 @@ class Apps_Controller extends Base_Controller {
 					'connection_token'         => \Appress\encrypt( $token ),
 					'connection_token_lookup'  => \Appress\lookup_hash( $token ),
 					'central_app_id'           => $central_app_id,
+					'unique_class'             => $unique_class !== '' ? $unique_class : null,
 					'build_information'        => wp_json_encode( $build_info ),
 					'live_config'              => wp_json_encode( $live_config_from_backup ),
 					'signing_secret'           => $signing_secret !== '' ? \Appress\encrypt( $signing_secret ) : null,
 				]);
+
+				if ( $unique_class !== '' ) {
+					\Appress\clear_apps_class_cache();
+				}
 
 				return wp_send_json( [
 					'success' => true,
@@ -1359,6 +1392,13 @@ class Apps_Controller extends Base_Controller {
 			$app_name   = ! empty( $data['post_title'] ) ? sanitize_text_field( $data['post_title'] ) : '';
 			$sha1       = sanitize_text_field( $data['sha1_fingerprint'] ?? '' );
 
+			// unique_class — Central-derived per-app identifier. Persist to its
+			// own column for fast lookup (used to scope mobile-facing endpoints).
+			// Validate to "X" + hex chars before accepting; empty / malformed
+			// → skip the column update, leave whatever's currently there intact.
+			$unique_class_raw = sanitize_text_field( $data['unique_class'] ?? '' );
+			$unique_class = preg_match( '/^X[a-f0-9]{8,32}$/', $unique_class_raw ) === 1 ? $unique_class_raw : '';
+
 			$build = json_decode( (string) $row['build_information'], true );
 			$build = is_array( $build ) ? $build : [];
 
@@ -1383,12 +1423,26 @@ class Apps_Controller extends Base_Controller {
 			if ( $app_name !== '' ) {
 				$update_payload['app_name'] = $app_name;
 			}
+			if ( $unique_class !== '' ) {
+				$update_payload['unique_class'] = $unique_class;
+			}
 			$wpdb->update( $table, $update_payload, [ 'id' => $app_id ] );
+
+			if ( $unique_class !== '' ) {
+				\Appress\clear_apps_class_cache();
+			}
+
+			// Expose unique_class to the Vue UI so the read-only field updates
+			// in place without a full hydrate round-trip.
+			$response_data = $essentials;
+			if ( $unique_class !== '' ) {
+				$response_data['unique_class'] = $unique_class;
+			}
 
 			return wp_send_json( [
 				'success' => true,
 				'message' => __( 'Settings saved.', 'appress' ),
-				'data'    => $essentials,
+				'data'    => $response_data,
 			] );
 		} catch ( \Exception $e ) {
 			return wp_send_json( [ 'success' => false, 'message' => $e->getMessage() ] );

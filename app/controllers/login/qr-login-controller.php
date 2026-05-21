@@ -34,15 +34,20 @@ class Qr_Login_Controller extends \Appress\Controllers\Base_Controller {
 	const TOKEN_BYTES      = 24;
 
 	protected function hooks() {
-		// `nopriv` for start + poll: the web initiator is by definition
-		// not yet logged in. `approve`/`deny` require the app's WP cookie
-		// auth, so logged-in only.
+		// `start` + `poll` are called by the WEB initiator (browser modal),
+		// not the mobile app — stay on the `appress_ajax_*` prefix the
+		// existing web JS uses. `nopriv` because the browser is by definition
+		// not yet logged in (login is the whole point).
 		$this->on( 'appress_ajax_qr_login.start',          '@handle_start' );
 		$this->on( 'appress_ajax_nopriv_qr_login.start',   '@handle_start' );
 		$this->on( 'appress_ajax_qr_login.poll',           '@handle_poll' );
 		$this->on( 'appress_ajax_nopriv_qr_login.poll',    '@handle_poll' );
-		$this->on( 'appress_ajax_qr_login.approve',        '@handle_approve' );
-		$this->on( 'appress_ajax_qr_login.deny',           '@handle_deny' );
+
+		// `approve` + `deny` are called by the MOBILE APP after the in-app
+		// scanner reads the QR — register on each app's `<class_id>_ajax_*`
+		// prefix + legacy `appress_ajax_*` for backward compat.
+		$this->on_mobile( 'qr_login.approve', '@handle_approve' );
+		$this->on_mobile( 'qr_login.deny',    '@handle_deny' );
 	}
 
 	/**

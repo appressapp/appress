@@ -60,8 +60,12 @@ class User_Language_Controller extends Base_Controller {
 	}
 
 	protected function hooks() {
-		$this->on( 'appress_ajax_translatepress.save_user_language', '@handle_save_user_language' );
-		$this->on( 'appress_ajax_translatepress.get_user_language',  '@handle_get_user_language' );
+		// Mobile-only — native TranslatePress integration in the app calls
+		// these when the user picks a language in the in-app switcher and
+		// when re-reading the persisted choice. Register on each app's
+		// `<class_id>_ajax_*` + legacy `appress_ajax_*` for backward compat.
+		$this->on_mobile( 'translatepress.save_user_language', '@handle_save_user_language' );
+		$this->on_mobile( 'translatepress.get_user_language',  '@handle_get_user_language' );
 	}
 
 	protected function handle_save_user_language() {

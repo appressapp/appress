@@ -20,6 +20,14 @@ return [
 	\Appress\Controllers\Plugin\Action_Links_Controller::class,
 	\Appress\Controllers\Plugin\Textdomain_Notice_Controller::class,
 
+	// Schema migration MUST run before any controller that selects from
+	// `wp_appress_apps` (Firebase router's on_mobile() → get_apps_class(),
+	// the AJAX ajax-controller's resolve_request_prefix(), etc.). Listing
+	// it here — before Assets / Updater / Firebase / Ajax — means the
+	// migration completes at controller boot and downstream hooks() calls
+	// see the post-1.1.0 schema.
+	\Appress\Controllers\App\Database_Controller::class,
+
 	\Appress\Controllers\Assets_Controller::class,
 
 	// Auto-update from GitHub Releases. Wires
@@ -75,8 +83,8 @@ return [
 
 	// Client API: Get Mobile App UI config
 
-	// App Management
-	\Appress\Controllers\App\Database_Controller::class,
+	// App Management (Database_Controller is registered earlier so its
+	// schema migration beats every consumer's hooks() call.)
 	\Appress\Controllers\App\Frontend_Controller::class,
 	\Appress\Controllers\App\Heartbeat_Controller::class,
 	// Cache invalidation — bumps every app's `live_config.update_time_hash`

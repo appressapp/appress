@@ -21,6 +21,52 @@ if ( ! defined('ABSPATH') ) {
 class Ajax_Controller extends Base_Controller {
 
 	/**
+	 * Resolve the URL-key prefix this request arrived on.
+	 *
+	 * Two accepted shapes:
+	 *   1. `?appress=1&action=…` → returns "appress". Used by Vue admin and
+	 *      mobile apps built before unique_class shipped.
+	 *   2. `?<unique_class>=1&action=…` → returns "<unique_class>". Used by
+	 *      mobile apps built by Build Engine v2+, where the URL key is the
+	 *      salted identifier baked into the native binary instead of the
+	 *      literal string "appress".
+	 *
+	 * Returns null when neither shape is present — caller treats that as
+	 * "not an Appress AJAX request, ignore". Multi-app aware: a single WP
+	 * install can host multiple connected apps via `wp_appress_apps`, each
+	 * with its own class id. The first matching key wins.
+	 *
+	 * The returned prefix is used to compose the per-app hook name
+	 * (`<prefix>_ajax_<action>`) so admin endpoints registered only on the
+	 * "appress" prefix cannot be invoked from the mobile URL shape — the
+	 * core segregation guarantee.
+	 *
+	 * Cached on the controller instance because `define_ajax` + `do_ajax`
+	 * both need it on the same request and the foreach is cheap but not
+	 * worth running twice.
+	 */
+	private $resolved_prefix = false; // false = not yet resolved, null = not Appress request
+
+	private function resolve_request_prefix() {
+		if ( $this->resolved_prefix !== false ) {
+			return $this->resolved_prefix;
+		}
+		if ( ! empty( $_GET['appress'] ) ) {
+			return $this->resolved_prefix = 'appress';
+		}
+		foreach ( \Appress\get_apps_class() as $class_id ) {
+			if ( ! empty( $_GET[ $class_id ] ) ) {
+				return $this->resolved_prefix = $class_id;
+			}
+		}
+		return $this->resolved_prefix = null;
+	}
+
+	private function is_appress_request() {
+		return $this->resolve_request_prefix() !== null;
+	}
+
+	/**
 	 * Custom AJAX handler for better performance compared to admin-ajax.php
 	 *
 	 * @link  https://woocommerce.wordpress.com/2015/07/30/custom-ajax-endpoints-in-2-4/
@@ -32,7 +78,7 @@ class Ajax_Controller extends Base_Controller {
 	}
 
 	protected function define_ajax() {
-		if ( empty( $_GET['appress'] ) ) {
+		if ( ! $this->is_appress_request() ) {
 			return;
 		}
 
@@ -112,7 +158,7 @@ class Ajax_Controller extends Base_Controller {
 	}
 
 	protected function do_ajax() {
-		if ( empty( $_GET['appress'] ) ) {
+		if ( ! $this->is_appress_request() ) {
 			return;
 		}
 
@@ -137,22 +183,28 @@ class Ajax_Controller extends Base_Controller {
 		$wp_query->set( 'appress-action', sanitize_text_field( wp_unslash( $_REQUEST['action'] ) ) );
 		$action = $wp_query->get( 'appress-action' );
 
+		// Fire the per-prefix hook. Mobile-app endpoints register on
+		// `<class_id>_ajax_<action>` via `Base_Controller::on_mobile()` —
+		// admin endpoints register on `appress_ajax_<action>` only. So a
+		// `?<class_id>=1` request CANNOT reach admin endpoints, and a
+		// `?appress=1` admin request CANNOT accidentally hit a mobile
+		// handler that opted out of the legacy prefix. The on_mobile()
+		// helper also registers the legacy "appress" prefix during the
+		// transition window so older mobile builds keep working.
+		$prefix = $this->resolve_request_prefix();
+
 		if ( is_user_logged_in() ) {
-			// an action must be registered
-			if ( ! has_action( "appress_ajax_{$action}" ) ) {
+			if ( ! has_action( "{$prefix}_ajax_{$action}" ) ) {
 				wp_die();
 			}
-
-			status_header(200);
-			do_action( "appress_ajax_{$action}" );
+			status_header( 200 );
+			do_action( "{$prefix}_ajax_{$action}" );
 		} else {
-			// an action must be registered
-			if ( ! has_action( "appress_ajax_nopriv_{$action}" ) ) {
+			if ( ! has_action( "{$prefix}_ajax_nopriv_{$action}" ) ) {
 				wp_die();
 			}
-
-			status_header(200);
-			do_action( "appress_ajax_nopriv_{$action}" );
+			status_header( 200 );
+			do_action( "{$prefix}_ajax_nopriv_{$action}" );
 		}
 
 		wp_die();

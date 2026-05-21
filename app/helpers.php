@@ -168,12 +168,23 @@ function get_assets_version() {
 
 /**
  * Get the App ID of the current request based on the User-Agent string.
- * Native apps send the format: Appress/{app_id}.
+ *
+ * Two UA formats supported:
+ *   - Post-Phase-4: `<unique_class> <unique_class>/<app_id>` (`X[hex]/(\d+)`).
+ *     Build engine emits this from build_1166 onward — every customer gets a
+ *     UA whose brand token equals the per-build salt instead of the literal
+ *     "Appress", killing the Apple 4.3(a) UA-side cluster signal.
+ *   - Legacy: `Appress Appress/<app_id>` (pre-1166 builds). Recognized via
+ *     `Appress/(\d+)` fallback so apps already in customers' hands keep
+ *     resolving against the same row.
  *
  * @return int
  */
 function get_current_app_id() {
 	$ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+	if ( preg_match( '/X[a-f0-9]{8,32}\/(\d+)/i', $ua, $matches ) ) {
+		return intval( $matches[1] );
+	}
 	if ( preg_match( '/Appress\/(\d+)/i', $ua, $matches ) ) {
 		return intval( $matches[1] );
 	}
@@ -358,12 +369,30 @@ function get_app_css( $app_id = 0 ) {
  * Detect whether the current request is coming from an Appress native app
  * (iOS or Android). Optionally scope the check to a single app id.
  *
+ * UA brand detection runs in two passes:
+ *   1. Post-Phase-4 builds: UA contains `<unique_class>` (a per-customer
+ *      `X[hex]` salt) — match against the apps table via `get_apps_class()`.
+ *      Falls into this path the moment Central pushes the unique_class
+ *      onto a row + a build with that salt reaches a user's device.
+ *   2. Legacy: UA contains the literal `Appress` substring — pre-1166
+ *      customer apps already in the wild. Keep working until they're
+ *      rebuilt against the new engine.
+ *
  * @param int $app_id Pass a specific app id to check for, or 0 for any app.
  * @return bool
  */
 function is_app( $app_id = 0 ) {
 	$ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
-	$is_app = strpos( $ua, 'Appress' ) !== false;
+	$is_app = false;
+	foreach ( get_apps_class() as $salt ) {
+		if ( $salt !== '' && strpos( $ua, $salt ) !== false ) {
+			$is_app = true;
+			break;
+		}
+	}
+	if ( ! $is_app && strpos( $ua, 'Appress' ) !== false ) {
+		$is_app = true;
+	}
 
 	if ( ! $is_app ) {
 		return false;
@@ -685,4 +714,55 @@ function _crypto_key() {
 		return hash_hkdf( 'sha256', $salt, 32, 'appress-crypto-v1' );
 	}
 	return substr( hash( 'sha256', 'appress-crypto-v1|' . $salt, true ), 0, 32 );
+}
+
+/**
+ * Return the list of `unique_class` identifiers across every connected app
+ * on this site. Each app row in `wp_appress_apps` has its own salted class
+ * id (`Xa1b2c3d4…`) issued by Central; this list is what the AJAX router
+ * accepts as alternate URL keys so the mobile app can hit
+ * `?<unique_class>=1&action=…` instead of the legacy `?appress=1&action=…`.
+ *
+ * Cached in-process for the request lifetime — every WP request that doesn't
+ * mutate the apps table reuses the first SELECT. Multi-app sites with N
+ * apps still incur exactly one DB hit per page. Pass true to bypass.
+ *
+ * Excludes empty / null values so apps that haven't completed onboarding
+ * yet (no Central sync) don't expose an empty-string key that would match
+ * every request without a `unique_class` param.
+ */
+function get_apps_class( $force_get = false ) {
+	static $cache = null;
+	if ( ! $force_get && $cache !== null ) {
+		return $cache;
+	}
+	global $wpdb;
+	$table = $wpdb->prefix . 'appress_apps';
+	// Defensive column check — the consumer (on_mobile router) is hot-path
+	// at plugins_loaded, so a transient schema gap (controller order
+	// regression, mid-deploy race, manual DROP COLUMN, etc.) would otherwise
+	// take the whole site down with "Unknown column". Cache the column's
+	// existence on the static map so we pay this `SHOW COLUMNS` cost once
+	// per request and stop the fatal at the helper boundary instead of
+	// letting it bubble up into every Ajax_Controller registration.
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$col = $wpdb->get_var( "SHOW COLUMNS FROM {$table} LIKE 'unique_class'" );
+	if ( empty( $col ) ) {
+		$cache = [];
+		return $cache;
+	}
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$rows  = $wpdb->get_col( "SELECT unique_class FROM {$table} WHERE unique_class IS NOT NULL AND unique_class != ''" );
+	$cache = array_values( array_unique( array_filter( (array) $rows, 'is_string' ) ) );
+	return $cache;
+}
+
+/**
+ * Invalidate the in-process `get_apps_class()` cache. Callers in
+ * `Apps_Controller` fire this after every insert / update / delete on
+ * the apps table so the same-request follow-up calls (e.g. the AJAX
+ * router that resolves the just-onboarded app) see the fresh list.
+ */
+function clear_apps_class_cache() {
+	get_apps_class( true );
 }

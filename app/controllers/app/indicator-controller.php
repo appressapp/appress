@@ -31,8 +31,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Indicator_Controller extends \Appress\Controllers\Base_Controller {
 
 	protected function hooks() {
-		$this->on( 'appress_ajax_app.get_indicators', '@handle_get_indicators' );
-		$this->on( 'appress_ajax_nopriv_app.get_indicators', '@handle_get_indicators' );
+		// Mobile-only — bottom-nav indicator counts the app polls + on
+		// realtime events. Register on each app's `<class_id>_ajax_*` +
+		// legacy `appress_ajax_*` for backward compat.
+		$this->on_mobile( 'app.get_indicators', '@handle_get_indicators' );
+
+		// Admin-only — Vue Builder lists registered indicator types so the
+		// admin can map them onto bottom-nav slots. Stays on
+		// `appress_ajax_*` (not reachable from mobile-app URL).
 		$this->on( 'appress_ajax_app.get_indicator_types', '@handle_get_indicator_types' );
 
 		// Built-in `notification` indicator — counts unread rows in the Appress

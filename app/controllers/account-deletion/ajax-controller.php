@@ -80,9 +80,13 @@ class Ajax_Controller extends Base_Controller {
 		// endpoints stay registered so we can flip back to email-confirm
 		// by swapping the JS `deleteUrl` → `requestUrl` + showing the
 		// verify screen again. Do NOT delete the OTP code paths.
-		$this->on( 'appress_ajax_auth.account_deletion.delete',       '@handle_delete' );
-		$this->on( 'appress_ajax_auth.account_deletion.request_code', '@handle_request_code' );
-		$this->on( 'appress_ajax_auth.account_deletion.verify_code',  '@handle_verify_code' );
+		// All three endpoints are mobile-only — the in-app Account → Delete
+		// widget is what calls them. Apple 5.1.1(v) requires this flow to
+		// be reachable from the app itself, so we register on each app's
+		// `<class_id>_ajax_*` + legacy `appress_ajax_*` for backward compat.
+		$this->on_mobile( 'auth.account_deletion.delete',       '@handle_delete' );
+		$this->on_mobile( 'auth.account_deletion.request_code', '@handle_request_code' );
+		$this->on_mobile( 'auth.account_deletion.verify_code',  '@handle_verify_code' );
 	}
 
 	/**

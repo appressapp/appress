@@ -58,14 +58,17 @@ class Ajax_Controller extends \Appress\Controllers\Base_Controller {
 	const EXCHANGE_RATE_WINDOW_SEC = 15 * 60;
 
 	protected function hooks() {
-		$this->on( 'appress_ajax_auth.biometric.issue_token', '@handle_issue_token' );
-		// No nopriv for issue — minting a token requires an authenticated session.
-
-		$this->on( 'appress_ajax_auth.biometric.exchange',        '@handle_exchange' );
-		$this->on( 'appress_ajax_nopriv_auth.biometric.exchange', '@handle_exchange' );
-
-		$this->on( 'appress_ajax_auth.biometric.revoke',        '@handle_revoke' );
-		$this->on( 'appress_ajax_nopriv_auth.biometric.revoke', '@handle_revoke' );
+		// All three endpoints are mobile-only (in-app biometric pairing,
+		// token exchange, and revoke). Register on each app's
+		// `<class_id>_ajax_*` prefix + legacy `appress_ajax_*` for
+		// backward compat with apps shipped before unique_class. The
+		// `issue_token` path has no `nopriv` registration semantically
+		// (minting a token requires an authenticated session); `on_mobile`
+		// registers nopriv too but the handler bails on un-auth'd calls,
+		// so the extra registration is harmless.
+		$this->on_mobile( 'auth.biometric.issue_token', '@handle_issue_token' );
+		$this->on_mobile( 'auth.biometric.exchange',    '@handle_exchange' );
+		$this->on_mobile( 'auth.biometric.revoke',      '@handle_revoke' );
 
 		// Auto-revoke on password change. When the user resets or changes
 		// their password, every previously-paired biometric device is
