@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.18
+Stable tag: 1.0.0.19
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,12 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.19 =
+* New "Splash Screen" section on the app settings page lets admins pick how the boot screen looks. Two modes: Default (your app logo centered on a background colour) and Custom Image (a full-screen image you upload).
+* Default mode adds an optional "Show Loading Bar" toggle so the animated progress pill under the logo can be turned off for a cleaner static splash.
+* Custom Image mode accepts a portrait image (1290×2796 recommended) — it's used full-bleed on every device and the background colour automatically matches the image edge so the system splash hand-off is seamless with no colour flash.
+* Background Color picker now sits inside the Splash Screen section instead of mixed in with App Information, making the boot-screen settings easier to find.
+
 = 1.0.0.18 =
 * New "Native Features" panel on the app settings page lets admins toggle which native frameworks ship with the build — Push Notifications, Biometric (Face ID / Touch ID), Google Sign-In, Sign in with Apple, QR Scanner, and Geolocation. Turning a feature off removes the related SDK from the binary and skips its permission prompt, giving a smaller download size and a cleaner data-safety disclosure on the App Store / Play Store.
 * Each toggle in Native Features now has a small info icon that opens the matching documentation page on docs.appress.app for setup steps and platform-specific notes.
@@ -226,6 +232,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.19 =
+Adds a Splash Screen section to the app settings — choose Default (logo on background) or Custom Image (full-screen image upload). Default mode also gains a Show Loading Bar toggle.
 
 = 1.0.0.18 =
 Adds the Native Features panel to bundle only the SDKs each app actually uses, gives every new build a unique fingerprint so the App Store stops flagging similar apps, and ships push notifications under the app's own name.

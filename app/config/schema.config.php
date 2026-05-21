@@ -29,14 +29,6 @@ return [
 					'hint' => __( 'Root URL of your website.', 'appress' )
 				]
 			],
-			'splash_bg_color' => [
-				'type' => 'color',
-				'label' => __( 'Splash Screen Background', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '#ffffff',
-				'required' => true,
-				'ui' => [ 'group' => 'app_info' ]
-			],
 			'logo' => [
 				'type' => 'file',
 				'label' => __( 'Application Logo', 'appress' ),
@@ -48,6 +40,61 @@ return [
 					'constraint' => 'square',
 					'min_size' => 1024,
 					'hint' => __( 'Square image (1:1). Minimum 1024×1024', 'appress' )
+				]
+			],
+
+			// ── Splash Screen ─────────────────────────────────────────────
+			// `splash_type` switches rendering between the centered-logo
+			// boot screen (current default) and a full-bleed image. The
+			// Build Engine bakes the chosen mode into the binary — only
+			// the matching `APPRESS-SPLASH-*` block survives the
+			// injector strip — so each app ships exactly one splash
+			// implementation. This increases per-build binary diversity
+			// (Apple 4.3a) on top of the user-facing customisation.
+			'splash_type' => [
+				'type' => 'select',
+				'label' => __( 'Splash Type', 'appress' ),
+				'sanitize' => 'text',
+				'default' => 'default',
+				'required' => true,
+				'ui' => [
+					'group' => 'splash_screen',
+					'options' => [
+						[ 'value' => 'default', 'label' => 'Default' ],
+						[ 'value' => 'image',   'label' => 'Custom Image' ],
+					],
+					'hint' => __( 'Choose how the app boot screen looks. Default shows the logo on a background color; Custom Image shows a full-screen image.', 'appress' ),
+				]
+			],
+			'splash_bg_color' => [
+				'type' => 'color',
+				'label' => __( 'Background Color', 'appress' ),
+				'sanitize' => 'text',
+				'default' => '#ffffff',
+				'required' => true,
+				'ui' => [
+					'group' => 'splash_screen',
+					'hint' => __( 'Behind the logo in Default mode. In Custom Image mode, match this to your image\'s edge color to avoid a color flash while the app launches.', 'appress' ),
+				]
+			],
+			'splash_show_loading_bar' => [
+				'type' => 'boolean',
+				'label' => __( 'Show Loading Bar', 'appress' ),
+				'sanitize' => 'boolean',
+				'default' => true,
+				'ui' => [
+					'group' => 'splash_screen',
+					'hint' => __( 'Animated progress pill displayed under the logo while the app boots.', 'appress' ),
+				]
+			],
+			'splash_image' => [
+				'type' => 'file',
+				'label' => __( 'Splash Image', 'appress' ),
+				'sanitize' => 'url',
+				'default' => '',
+				'ui' => [
+					'group' => 'splash_screen',
+					'hint' => __( 'Portrait image recommended. Use a high resolution (at least 1290×2796) so it stays crisp on large phones. The image is center-cropped to fit each device screen.', 'appress' )
 				]
 			],
 			'sha1_fingerprint' => [

@@ -976,6 +976,16 @@ class Apps_Controller extends Base_Controller {
 				'app_id'           => $app_id,
 				'title'            => $build_info['title']           ?? '',
 				'splash_bg_color'  => $build_info['splash_bg_color']  ?? '',
+				// Splash mode + companion settings. Build Engine bakes the
+				// chosen mode into the binary (strips the unused
+				// APPRESS-SPLASH-* block) so each app ships exactly one
+				// rendering path — extra source-level diversity on top of
+				// the user-facing choice.
+				'splash_type'             => $build_info['splash_type']             ?? 'default',
+				'splash_show_loading_bar' => isset( $build_info['splash_show_loading_bar'] )
+					? (bool) $build_info['splash_show_loading_bar']
+					: true,
+				'splash_image'            => $build_info['splash_image']            ?? '',
 				'firebase_android' => $b64_android,
 				'firebase_ios'     => $b64_ios,
 
