@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.19
+Stable tag: 1.0.0.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,12 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.20 =
+* New onboarding tour pops up the first time you open the settings page for a new app — a 4-slide walkthrough of the app's building blocks (Build Information, App Screens, Bottom Navigation, Side Menus) with an inline phone mockup that animates each component as you step through.
+* Every slide has a "Go to this section" button that jumps straight to the matching settings card (auto-switches tabs if needed) and a "Read docs" link that opens the relevant documentation page in a new tab.
+* The tour can be re-opened any time from the new help button (?) in the page header. Use "Don't show again" to silence it permanently for that app, or just close it to have it reappear on the next visit.
+* Removed the AdMob / in-app advertising fields from the app settings page — the plugin no longer ships ad SDK toggles. New builds are smaller and the related App Store / Play Store data-safety disclosure is no longer required.
+
 = 1.0.0.19 =
 * New "Splash Screen" section on the app settings page lets admins pick how the boot screen looks. Two modes: Default (your app logo centered on a background colour) and Custom Image (a full-screen image you upload).
 * Default mode adds an optional "Show Loading Bar" toggle so the animated progress pill under the logo can be turned off for a cleaner static splash.
@@ -232,6 +238,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.20 =
+Adds a 4-step onboarding tour for new apps with an animated phone mockup and "Go to section" / "Read docs" buttons on every slide. Removes the unused AdMob fields from the app settings page.
 
 = 1.0.0.19 =
 Adds a Splash Screen section to the app settings — choose Default (logo on background) or Custom Image (full-screen image upload). Default mode also gains a Show Loading Bar toggle.

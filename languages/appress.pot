@@ -79,22 +79,6 @@ msgstr ""
 msgid "Build Number"
 msgstr ""
 
-#: app/config/schema.config.php:156 app/i18n/vue-strings.php:33
-msgid "AdMob"
-msgstr ""
-
-#: app/config/schema.config.php:162
-msgid "Enable AdMob"
-msgstr ""
-
-#: app/config/schema.config.php:173
-msgid "AdMob App ID (iOS)"
-msgstr ""
-
-#: app/config/schema.config.php:185
-msgid "AdMob App ID (Android)"
-msgstr ""
-
 #: app/config/schema.config.php:207
 msgid "Custom CSS (Global)"
 msgstr ""
@@ -376,12 +360,6 @@ msgstr ""
 msgid "Enable in-app ads"
 msgstr ""
 
-#: app/config/schema.config.php:692
-msgid ""
-"Master switch. Requires AdMob App IDs set in Build Information and a rebuilt "
-"binary before ads will actually load."
-msgstr ""
-
 #: app/config/schema.config.php:700
 msgid "Enable Interstitial"
 msgstr ""
@@ -453,13 +431,6 @@ msgstr ""
 
 #: app/config/schema.config.php:805
 msgid "Disable web ads inside app"
-msgstr ""
-
-#: app/config/schema.config.php:810
-msgid ""
-"Prevent your website's existing ad platforms from loading inside the app. "
-"Use this to avoid double ads when native AdMob is on, or simply for a "
-"cleaner in-app experience."
 msgstr ""
 
 #: app/config/schema.config.php:815 app/i18n/vue-strings.php:286
@@ -829,13 +800,6 @@ msgstr ""
 
 #: app/i18n/vue-strings.php:86
 msgid "Configure"
-msgstr ""
-
-#: app/i18n/vue-strings.php:87
-msgid ""
-"Configure AdMob in-app ads. Make sure AdMob App IDs are set in Build "
-"Information and the app has been rebuilt — the SDK cannot initialise without "
-"them."
 msgstr ""
 
 #: app/i18n/vue-strings.php:88
@@ -1236,15 +1200,6 @@ msgstr ""
 
 #: app/i18n/vue-strings.php:185
 msgid "Manual code"
-msgstr ""
-
-#: app/i18n/vue-strings.php:186
-msgid ""
-"Master switch controls whether the Google Mobile Ads SDK is bundled into the "
-"binary. Turn ON only if you'll serve AdMob ads — leaving it OFF keeps the "
-"build smaller and avoids the SDK's startup crash when App IDs aren't set. Ad "
-"Unit IDs, frequency caps and format toggles live in Live App Builder → "
-"Monetization (no rebuild needed)."
 msgstr ""
 
 #: app/i18n/vue-strings.php:187

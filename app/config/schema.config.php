@@ -188,60 +188,6 @@ return [
 				'sanitize' => 'number',
 				'default' => 1
 			],
-			// ── AdMob ─────────────────────────────────────────────────────
-			// Nested so the whole integration is one conceptual unit in config,
-			// admin UI, and persistence. `enabled` is the master switch —
-			// OFF (default) strips @capacitor-community/admob from package.json
-			// before `cap add`, skips Info.plist / AndroidManifest meta keys,
-			// → no GoogleMobileAds SDK bundled → no startup crash from a
-			// missing Application ID. ON bakes both App IDs in; changing
-			// them later requires a rebuild. Ad Unit IDs (per-format slot
-			// IDs) stay in live_config so they can be swapped without
-			// rebuilding.
-			'admob' => [
-				'type' => 'object',
-				'label' => __( 'AdMob', 'appress' ),
-				'sanitize' => 'object',
-				'default' => [],
-				'fields' => [
-					'enabled' => [
-						'type' => 'boolean',
-						'label' => __( 'Enable AdMob', 'appress' ),
-						'sanitize' => 'boolean',
-						'default' => false,
-						'ui' => [
-							'group' => 'admob_main',
-							'col_span' => 2,
-							'hint' => __( 'Turn on to bundle the Google Mobile Ads SDK into the next build. Leave OFF for apps that don\'t monetize with AdMob — keeps the binary smaller and avoids the SDK\'s startup initialization crash when App IDs aren\'t set.', 'appress' )
-						]
-					],
-					'app_id_ios' => [
-						'type' => 'text',
-						'label' => __( 'AdMob App ID (iOS)', 'appress' ),
-						'sanitize' => 'text',
-						'default' => '',
-						'ui' => [
-							'group' => 'admob_main',
-							'placeholder' => 'ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY',
-							'show_if' => 'enabled',
-							'hint' => __( 'From AdMob Console → Apps → iOS app → App ID. Required once per app and baked into Info.plist; changing this value requires rebuilding the IPA.', 'appress' )
-						]
-					],
-					'app_id_android' => [
-						'type' => 'text',
-						'label' => __( 'AdMob App ID (Android)', 'appress' ),
-						'sanitize' => 'text',
-						'default' => '',
-						'ui' => [
-							'group' => 'admob_main',
-							'placeholder' => 'ca-app-pub-XXXXXXXXXXXXXXXX~ZZZZZZZZZZ',
-							'show_if' => 'enabled',
-							'hint' => __( 'From AdMob Console → Apps → Android app → App ID. Baked into AndroidManifest.xml; changing this value requires rebuilding the APK.', 'appress' )
-						]
-					],
-				]
-			],
-
 			// ── Native Features ─────────────────────────────────────────────
 			// Per-feature build-time toggles. Each one decides whether the
 			// related Capacitor plugin + native framework gets bundled into
@@ -257,9 +203,9 @@ return [
 			// and conditionally includes the plugin in `npm install` + the
 			// native code injection step.
 			//
-			// Mirror of the admob pattern: each feature is its own object
-			// with an `enabled` field today + room to add per-feature
-			// configuration (provider tokens, permission strings, etc.) later.
+			// Each feature is its own object with an `enabled` field today,
+			// with room to add per-feature configuration (provider tokens,
+			// permission strings, etc.) later.
 
 			'push_notifications' => [
 				'type' => 'object',
@@ -926,128 +872,6 @@ return [
 				]
 			],
 
-			// ── Monetization (AdMob live config) ─────────────────────────
-			// Unit IDs + frequency gates are live-editable: changes roll out
-			// to already-installed apps on the next `app.boot` sync, no rebuild
-			// required. The App IDs that bootstrap the AdMob SDK live in
-			// build_information (baked into Info.plist / AndroidManifest.xml).
-			'ads_enabled' => [
-				'type' => 'boolean',
-				'label' => __( 'Enable in-app ads', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => false,
-				'ui' => [
-					'group' => 'ads_general',
-					'hint' => __( 'Master switch. Requires AdMob App IDs set in Build Information and a rebuilt binary before ads will actually load.', 'appress' ),
-					'col_span' => 2,
-				]
-			],
-
-			// ── Interstitial (full-screen between subscreen pushes) ──────
-			'ads_interstitial_enabled' => [
-				'type' => 'boolean',
-				'label' => __( 'Enable Interstitial', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => false,
-				'ui' => [
-					'group' => 'ads_interstitial',
-					'show_if' => 'ads_enabled',
-					'col_span' => 2,
-					'hint' => __( 'Fires when the app pushes a subscreen (detail page) — the natural micro-loading moment.', 'appress' )
-				]
-			],
-			'ads_interstitial_unit_id_ios' => [
-				'type' => 'text',
-				'label' => __( 'Interstitial Unit ID (iOS)', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [
-					'group' => 'ads_interstitial',
-					'show_if' => 'ads_enabled && ads_interstitial_enabled',
-					'placeholder' => 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY'
-				]
-			],
-			'ads_interstitial_unit_id_android' => [
-				'type' => 'text',
-				'label' => __( 'Interstitial Unit ID (Android)', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [
-					'group' => 'ads_interstitial',
-					'show_if' => 'ads_enabled && ads_interstitial_enabled',
-					'placeholder' => 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ'
-				]
-			],
-			'ads_interstitial_min_pushes' => [
-				'type' => 'number',
-				'label' => __( 'Show after N subscreen opens', 'appress' ),
-				'sanitize' => 'number',
-				'default' => 4,
-				'ui' => [
-					'group' => 'ads_interstitial',
-					'show_if' => 'ads_enabled && ads_interstitial_enabled',
-					'hint' => __( 'Counter increments on every pushStandaloneScreen call (root → sub, sub → sub, deep link). Resets after each ad. Lower = more ads. Recommended: 4.', 'appress' )
-				]
-			],
-			'ads_interstitial_min_seconds' => [
-				'type' => 'number',
-				'label' => __( 'Minimum seconds between ads', 'appress' ),
-				'sanitize' => 'number',
-				'default' => 90,
-				'ui' => [
-					'group' => 'ads_interstitial',
-					'show_if' => 'ads_enabled && ads_interstitial_enabled',
-					'hint' => __( 'Even if the push-counter threshold is reached, skip if the previous ad fired less than this many seconds ago. Prevents two ads back-to-back during rapid browsing. Set 0 to disable this guard.', 'appress' )
-				]
-			],
-
-			// ── App Open (full-screen when resuming from background) ─────
-			'ads_app_open_enabled' => [
-				'type' => 'boolean',
-				'label' => __( 'Enable App Open', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => false,
-				'ui' => [
-					'group' => 'ads_app_open',
-					'show_if' => 'ads_enabled',
-					'col_span' => 2,
-					'hint' => __( 'Fires briefly when the user brings the app back to the foreground after backgrounding it.', 'appress' )
-				]
-			],
-			'ads_app_open_unit_id_ios' => [
-				'type' => 'text',
-				'label' => __( 'App Open Unit ID (iOS)', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [
-					'group' => 'ads_app_open',
-					'show_if' => 'ads_enabled && ads_app_open_enabled',
-					'placeholder' => 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY'
-				]
-			],
-			'ads_app_open_unit_id_android' => [
-				'type' => 'text',
-				'label' => __( 'App Open Unit ID (Android)', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [
-					'group' => 'ads_app_open',
-					'show_if' => 'ads_enabled && ads_app_open_enabled',
-					'placeholder' => 'ca-app-pub-XXXXXXXXXXXXXXXX/ZZZZZZZZZZ'
-				]
-			],
-			'ads_app_open_cooldown_secs' => [
-				'type' => 'number',
-				'label' => __( 'Minimum backgrounded seconds', 'appress' ),
-				'sanitize' => 'number',
-				'default' => 240,
-				'ui' => [
-					'group' => 'ads_app_open',
-					'show_if' => 'ads_enabled && ads_app_open_enabled',
-					'hint' => __( 'Skip the ad if the app was in background less than this many seconds. Filters out trivial interrupts (notification pull-down, biometric popups, Control Center, quick app-switches). Recommended: 240 (4 min). Set 0 to show on every resume.', 'appress' )
-				]
-			],
-
 			// ── Disable Web Ads (hide existing site ads when viewed in-app) ──
 			'disable_web_ads' => [
 				'type' => 'boolean',
@@ -1056,7 +880,7 @@ return [
 				'default' => false,
 				'ui' => [
 					'group' => 'disable_web_ads',
-					'hint' => __( 'Prevent your website\'s existing ad platforms from loading inside the app. Use this to avoid double ads when native AdMob is on, or simply for a cleaner in-app experience.', 'appress' )
+					'hint' => __( 'Prevent your website\'s existing ad platforms from loading inside the app — cleaner in-app experience.', 'appress' )
 				]
 			],
 			'disable_web_ads_platforms' => [

@@ -79,22 +79,6 @@ msgstr "Phiên bản Ứng dụng"
 msgid "Build Number"
 msgstr "Số Build"
 
-#: app/config/schema.config.php:156 app/i18n/vue-strings.php:33
-msgid "AdMob"
-msgstr "AdMob"
-
-#: app/config/schema.config.php:162
-msgid "Enable AdMob"
-msgstr "Bật AdMob"
-
-#: app/config/schema.config.php:173
-msgid "AdMob App ID (iOS)"
-msgstr "AdMob App ID (iOS)"
-
-#: app/config/schema.config.php:185
-msgid "AdMob App ID (Android)"
-msgstr "AdMob App ID (Android)"
-
 #: app/config/schema.config.php:207
 msgid "Custom CSS (Global)"
 msgstr "CSS tuỳ chỉnh (Toàn cục)"
@@ -376,12 +360,6 @@ msgstr "Tải trước"
 msgid "Enable in-app ads"
 msgstr "Bật quảng cáo trong app"
 
-#: app/config/schema.config.php:692
-msgid ""
-"Master switch. Requires AdMob App IDs set in Build Information and a rebuilt "
-"binary before ads will actually load."
-msgstr "Công tắc tổng. Cần đặt AdMob App ID trong Build Information và build lại app trước khi quảng cáo có thể hoạt động."
-
 #: app/config/schema.config.php:700
 msgid "Enable Interstitial"
 msgstr "Bật Interstitial"
@@ -454,13 +432,6 @@ msgstr "Bỏ qua quảng cáo nếu app ở background ít hơn số giây này.
 #: app/config/schema.config.php:805
 msgid "Disable web ads inside app"
 msgstr "Tắt quảng cáo web trong app"
-
-#: app/config/schema.config.php:810
-msgid ""
-"Prevent your website's existing ad platforms from loading inside the app. "
-"Use this to avoid double ads when native AdMob is on, or simply for a "
-"cleaner in-app experience."
-msgstr "Ngăn các nền tảng quảng cáo có sẵn trên website tải bên trong app. Dùng để tránh quảng cáo trùng khi bật AdMob native, hoặc đơn giản để app sạch hơn."
 
 #: app/config/schema.config.php:815 app/i18n/vue-strings.php:286
 msgid "Select your current web ad platforms"
@@ -830,13 +801,6 @@ msgstr "Đã nhập cấu hình thành công! Vui lòng kiểm tra và bấm Lư
 #: app/i18n/vue-strings.php:86
 msgid "Configure"
 msgstr "Cấu hình"
-
-#: app/i18n/vue-strings.php:87
-msgid ""
-"Configure AdMob in-app ads. Make sure AdMob App IDs are set in Build "
-"Information and the app has been rebuilt — the SDK cannot initialise without "
-"them."
-msgstr "Cấu hình quảng cáo AdMob trong app. Đảm bảo đã đặt AdMob App ID trong Build Information và app đã được build lại — SDK không thể khởi tạo nếu thiếu."
 
 #: app/i18n/vue-strings.php:88
 msgid "Connect"
@@ -1241,15 +1205,6 @@ msgstr "Quản lý trong Play Console"
 #: app/i18n/vue-strings.php:185
 msgid "Manual code"
 msgstr "Nhập mã thủ công"
-
-#: app/i18n/vue-strings.php:186
-msgid ""
-"Master switch controls whether the Google Mobile Ads SDK is bundled into the "
-"binary. Turn ON only if you'll serve AdMob ads — leaving it OFF keeps the "
-"build smaller and avoids the SDK's startup crash when App IDs aren't set. Ad "
-"Unit IDs, frequency caps and format toggles live in Live App Builder → "
-"Monetization (no rebuild needed)."
-msgstr "Công tắc tổng quyết định có gói SDK Google Mobile Ads vào binary hay không. Chỉ BẬT nếu bạn sẽ chạy quảng cáo AdMob — TẮT giúp build gọn hơn và tránh crash khi khởi động khi chưa đặt App ID. Ad Unit ID, giới hạn tần suất và toggle định dạng nằm trong Live App Builder → Kiếm tiền (không cần build lại)."
 
 #: app/i18n/vue-strings.php:187
 msgid "Media library not available"
