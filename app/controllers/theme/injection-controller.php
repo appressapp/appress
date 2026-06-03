@@ -71,8 +71,12 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
         $salt   = \Appress\get_app_unique_class( $app_id );
         if ( $salt === '' ) return;  // no salt → leave literals alone (legacy / web)
 
-        $ns         = 'X' . $salt;
-        $css_prefix = 'x' . strtolower( $salt );
+        // Salt is already in canonical `X<hex>` form (the column stores
+        // exactly the string the mutator concatenates onto class names);
+        // use as-is so emitted tokens stay byte-identical to the binary
+        // literals. lowercase variant covers CSS land.
+        $ns         = $salt;
+        $css_prefix = strtolower( $salt );
 
         ob_start( function ( $buffer ) use ( $ns, $css_prefix ) {
             if ( ! is_string( $buffer ) || $buffer === '' ) return $buffer;

@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.22
+Stable tag: 1.0.0.23
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.23 =
+* Fixed: the per-app JS namespace and CSS variable names introduced in 1.0.0.22 were emitting with a duplicate "X" / "x" prefix that didn't match the binary side. The result was your in-app biometric / sticky / status-bar-height code never resolving the namespace and silently failing. Anyone who upgraded to 1.0.0.22 should upgrade to 1.0.0.23 right away.
 
 = 1.0.0.22 =
 * Every app built from this site now gets its own unique JavaScript namespace and CSS variable names so the App Store and Play Store can't lump your customers' apps together as "similar apps". Your existing biometric / sticky / status-bar-height code keeps working with no changes — the rewrite happens automatically only on requests coming from the native app.

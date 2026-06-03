@@ -808,29 +808,39 @@ function get_app_unique_class( int $app_id ): string {
  * literal, and this helper produces the matching string on the WP side
  * so customer site's inline JS calls resolve to the same namespace.
  *
- *   App context (`unique_class` resolved) → `X<unique_class>` (e.g.
- *   `Xb5093566b25d`). Pre-Phase-4 / web context → `Appress` (legacy).
+ *   App context (`unique_class` resolved) → raw `unique_class` value
+ *   (e.g. `Xb5093566b25d`). Pre-Phase-4 / web context → `Appress`
+ *   (legacy).
  *
- * Pattern: `X` + raw `unique_class` value. Matches the salt format
- * the native side uses for class renames (`X<hex>...`).
+ * The `unique_class` column already stores the salt in its canonical
+ * `X<hex>` form — the same string the mutator concatenates onto class
+ * names (`Xb5093566b25d07656decd848`). Returning it AS-IS keeps the
+ * plugin's emitted tokens byte-identical to the binary's baked JS
+ * literals. Adding an extra `X` prefix here would yield `XX<hex>`
+ * and break the cross-boundary contract.
  */
 function get_js_namespace( int $app_id = 0 ): string {
 	if ( $app_id <= 0 ) $app_id = get_current_app_id();
 	$salt = get_app_unique_class( $app_id );
-	return $salt !== '' ? 'X' . $salt : 'Appress';
+	return $salt !== '' ? $salt : 'Appress';
 }
 
 /**
  * CSS identifier prefix — lowercase counterpart of `get_js_namespace()`.
  * Used for CSS custom properties (`--<prefix>-status-bar-height`) and
  * CSS class selectors (`.<prefix>-sticky`). Mirrors the mutator's
- * lowercase-salt boundary mutation on native CSS literals.
+ * `salt.toLowerCase()` boundary mutation on native CSS literals.
  *
- *   App context → `x<unique_class_lc>` (e.g. `xb5093566b25d`)
+ *   App context → lowercased raw salt (e.g. `xb5093566b25d`)
  *   Web / pre-Phase-4 → `appress` (legacy)
+ *
+ * Just `strtolower($salt)` — the salt's canonical `X<hex>` form
+ * lowercases cleanly to `x<hex>` which is exactly what the mutator
+ * emits via `saltLc = salt.toLowerCase()` in `applyBoundaryMutation`.
+ * No extra prefix.
  */
 function get_css_prefix( int $app_id = 0 ): string {
 	if ( $app_id <= 0 ) $app_id = get_current_app_id();
 	$salt = get_app_unique_class( $app_id );
-	return $salt !== '' ? 'x' . strtolower( $salt ) : 'appress';
+	return $salt !== '' ? strtolower( $salt ) : 'appress';
 }
