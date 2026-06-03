@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.23
+Stable tag: 1.0.0.24
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.24 =
+* Fixed: the per-app namespace rewrite missed the native bridge handler names (used by biometric sign-in, indicator badges, smart banner, and the WooCommerce account integrations). Those handlers register in the app's binary under a per-build scrambled name, but the JavaScript the plugin emits was still calling them by the original `AppressNativeBridge` / `AppressMasterBridge` / `AppressLinkIntercept` / `AppressNotificationsFeed` etc. names — so the calls quietly no-op'd. The output filter now applies the same HMAC scramble the binary uses, so every bridge call resolves end-to-end. Required alongside Build Engine v1.0.18+.
 
 = 1.0.0.23 =
 * Fixed: the per-app JS namespace and CSS variable names introduced in 1.0.0.22 were emitting with a duplicate "X" / "x" prefix that didn't match the binary side. The result was your in-app biometric / sticky / status-bar-height code never resolving the namespace and silently failing. Anyone who upgraded to 1.0.0.22 should upgrade to 1.0.0.23 right away.

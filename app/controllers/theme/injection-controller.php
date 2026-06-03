@@ -80,10 +80,36 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
 
         ob_start( function ( $buffer ) use ( $ns, $css_prefix ) {
             if ( ! is_string( $buffer ) || $buffer === '' ) return $buffer;
+
+            // CLASS-MUTATION mirror — `\bAppress<UpperCase>\w*` →
+            // `<salt><hmac12(suffix)>`. Same algorithm as the build
+            // engine mutator's `applyClassMutation` + `scrambleSuffix`
+            // (HMAC-SHA256(salt, suffix), 12 hex chars). The native
+            // binary registers bridge handlers (`AppressNativeBridge`,
+            // `AppressMasterBridge`, `AppressLinkIntercept`,
+            // `AppressNotificationsFeed`, `AppressFirstLaunchBridge`,
+            // `AppressBiometricService`, …) under their salt-scrambled
+            // names; without this mirror the plugin's emitted
+            // `window.AppressNativeBridge.postMessage(…)` calls look
+            // for a handler that doesn't exist in the binary, so
+            // bridge calls silently no-op (biometric / indicators /
+            // status-bar JS dead). MUST run BEFORE the bare
+            // `window.Appress` substitution below so `Appress<Upper>`
+            // matches take priority — the bare-namespace regex's
+            // negative lookahead would otherwise be unaffected here
+            // (disjoint sets), but keeping this first defends against
+            // future regex tweaks.
+            $buffer = preg_replace_callback(
+                '/\bAppress([A-Z]\w*)/',
+                function ( $m ) use ( $ns ) {
+                    return $ns . substr( hash_hmac( 'sha256', $m[1], $ns ), 0, 12 );
+                },
+                $buffer
+            );
+
             // `window.Appress` (negative lookahead on identifier char so
-            // `window.AppressBiometricService` class refs from binary-
-            // adjacent code paths are not clobbered — those go through
-            // the mutator's class regex separately).
+            // any `Appress<Upper>` ref already rewritten above isn't
+            // double-touched).
             $buffer = preg_replace(
                 '/\bwindow\.Appress(?![A-Za-z0-9_])/',
                 'window.' . $ns,
