@@ -766,3 +766,71 @@ function get_apps_class( $force_get = false ) {
 function clear_apps_class_cache() {
 	get_apps_class( true );
 }
+
+/**
+ * Lookup the per-app `unique_class` salt baked into a customer's binary.
+ * Used to namespace every JS / CSS identifier the plugin emits so the
+ * companion mobile app's binary literals + the customer-site emitted
+ * tokens line up without leaking the shared `Appress` brand across
+ * apps (Apple 4.3a / Play Store similarity classifier).
+ *
+ * Returns an empty string when:
+ *   - `$app_id` is 0 / invalid
+ *   - The row has no `unique_class` (pre-Phase-4 row, legacy state)
+ *   - The schema lacks the `unique_class` column (mid-deploy race)
+ *
+ * Caller treats empty → fallback to literal `Appress` / `appress`
+ * tokens (legacy contract). Multi-app sites resolve per-request via
+ * `get_current_app_id()` so each visitor's UA-detected app gets its
+ * own namespace.
+ */
+function get_app_unique_class( int $app_id ): string {
+	if ( $app_id <= 0 ) return '';
+	static $cache = [];
+	if ( isset( $cache[ $app_id ] ) ) return $cache[ $app_id ];
+
+	global $wpdb;
+	$table = $wpdb->prefix . 'appress_apps';
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	$col = $wpdb->get_var( "SHOW COLUMNS FROM {$table} LIKE 'unique_class'" );
+	if ( empty( $col ) ) {
+		return $cache[ $app_id ] = '';
+	}
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
+	$val = (string) $wpdb->get_var( $wpdb->prepare( "SELECT unique_class FROM {$table} WHERE id = %d LIMIT 1", $app_id ) );
+	return $cache[ $app_id ] = $val;
+}
+
+/**
+ * JS namespace token for the current (or specified) app. Mirrors the
+ * mutator's `applyBoundaryMutation` output — the build engine rewrites
+ * `window.Appress` → `window.<salt>` in every Swift/Java-baked JS
+ * literal, and this helper produces the matching string on the WP side
+ * so customer site's inline JS calls resolve to the same namespace.
+ *
+ *   App context (`unique_class` resolved) → `X<unique_class>` (e.g.
+ *   `Xb5093566b25d`). Pre-Phase-4 / web context → `Appress` (legacy).
+ *
+ * Pattern: `X` + raw `unique_class` value. Matches the salt format
+ * the native side uses for class renames (`X<hex>...`).
+ */
+function get_js_namespace( int $app_id = 0 ): string {
+	if ( $app_id <= 0 ) $app_id = get_current_app_id();
+	$salt = get_app_unique_class( $app_id );
+	return $salt !== '' ? 'X' . $salt : 'Appress';
+}
+
+/**
+ * CSS identifier prefix — lowercase counterpart of `get_js_namespace()`.
+ * Used for CSS custom properties (`--<prefix>-status-bar-height`) and
+ * CSS class selectors (`.<prefix>-sticky`). Mirrors the mutator's
+ * lowercase-salt boundary mutation on native CSS literals.
+ *
+ *   App context → `x<unique_class_lc>` (e.g. `xb5093566b25d`)
+ *   Web / pre-Phase-4 → `appress` (legacy)
+ */
+function get_css_prefix( int $app_id = 0 ): string {
+	if ( $app_id <= 0 ) $app_id = get_current_app_id();
+	$salt = get_app_unique_class( $app_id );
+	return $salt !== '' ? 'x' . strtolower( $salt ) : 'appress';
+}

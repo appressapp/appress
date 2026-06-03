@@ -44,6 +44,63 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
         // duration; zero or missing duration = no-op (prefetch still
         // fires but HTTP cache stays as WP sent it).
         $this->on('send_headers', '@relax_cache_control_for_prefetch', 999);
+
+        // Boundary-token rewrite safety net. Buffer the page output
+        // for app requests and replace the literal `window.Appress`
+        // namespace + `--appress-status-bar-height` CSS var + related
+        // class selectors with the per-app salted forms that match
+        // the binary's `applyBoundaryMutation` output (see
+        // `build-engine/.../mutator.js`). Inline scripts and CSS
+        // emitted via `wp_add_inline_*` use the helpers directly when
+        // they can; this filter catches anything still going through
+        // raw heredoc emission inside trait/widget/integration code
+        // paths so the customer site's `window.Appress.biometric` JS
+        // call resolves to the same `window.X<salt>` object the binary
+        // exposes. Gated on `is_app()` + a resolved unique_class so web
+        // requests + legacy apps see the original tokens unchanged.
+        $this->on('template_redirect', '@start_boundary_buffer', 0);
+    }
+
+    /**
+     * Start an output buffer that swaps shared boundary tokens to the
+     * per-app salted forms when the response is going to an app webview.
+     * Buffer flushes at request shutdown.
+     */
+    public function start_boundary_buffer() {
+        $app_id = \Appress\get_current_app_id();
+        $salt   = \Appress\get_app_unique_class( $app_id );
+        if ( $salt === '' ) return;  // no salt → leave literals alone (legacy / web)
+
+        $ns         = 'X' . $salt;
+        $css_prefix = 'x' . strtolower( $salt );
+
+        ob_start( function ( $buffer ) use ( $ns, $css_prefix ) {
+            if ( ! is_string( $buffer ) || $buffer === '' ) return $buffer;
+            // `window.Appress` (negative lookahead on identifier char so
+            // `window.AppressBiometricService` class refs from binary-
+            // adjacent code paths are not clobbered — those go through
+            // the mutator's class regex separately).
+            $buffer = preg_replace(
+                '/\bwindow\.Appress(?![A-Za-z0-9_])/',
+                'window.' . $ns,
+                $buffer
+            );
+            // Custom property names (definition + var() references).
+            $buffer = str_replace(
+                '--appress-status-bar-height',
+                '--' . $css_prefix . '-status-bar-height',
+                $buffer
+            );
+            // CSS class tokens (selectors + element class="" attribute
+            // values). `\bappress-(sticky|status-bar-height)\b` so we
+            // don't accidentally rewrite `appress-app` etc.
+            $buffer = preg_replace(
+                '/\bappress-(sticky|status-bar-height)\b/',
+                $css_prefix . '-$1',
+                $buffer
+            );
+            return $buffer;
+        } );
     }
 
     public function enqueue_native_assets()
@@ -68,9 +125,10 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
             if (!empty($selectors)) {
                 wp_register_script('appress-inline-link-selectors', false, ['appress-sticky'], $version, false);
                 wp_enqueue_script('appress-inline-link-selectors');
+                $ns = \Appress\get_js_namespace( $app_id );
                 wp_add_inline_script(
                     'appress-inline-link-selectors',
-                    'window.Appress = window.Appress || {}; window.Appress.inlineLinkSelectors = ' . wp_json_encode(array_values($selectors)) . ';',
+                    "window.{$ns} = window.{$ns} || {}; window.{$ns}.inlineLinkSelectors = " . wp_json_encode( array_values( $selectors ) ) . ';',
                     'before'
                 );
             }

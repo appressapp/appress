@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.21
+Stable tag: 1.0.0.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.22 =
+* Every app built from this site now gets its own unique JavaScript namespace and CSS variable names so the App Store and Play Store can't lump your customers' apps together as "similar apps". Your existing biometric / sticky / status-bar-height code keeps working with no changes — the rewrite happens automatically only on requests coming from the native app.
+* Companion to Build Engine v1.0.18: this release MUST be live on every customer site before any v1.0.18-built app installs, otherwise the in-app calls won't resolve to the right namespace.
 
 = 1.0.0.21 =
 * Settings page restructured — the "Build Information" tab is now called "Build Config", and the separate "Live App Builder" tab has been retired. Everything you used to configure across both is now in one place. Your existing settings carry over automatically; no re-entry needed.
