@@ -82,23 +82,14 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
             if ( ! is_string( $buffer ) || $buffer === '' ) return $buffer;
 
             // CLASS-MUTATION mirror — `\bAppress<UpperCase>\w*` →
-            // `<salt><hmac12(suffix)>`. Same algorithm as the build
-            // engine mutator's `applyClassMutation` + `scrambleSuffix`
-            // (HMAC-SHA256(salt, suffix), 12 hex chars). The native
-            // binary registers bridge handlers (`AppressNativeBridge`,
-            // `AppressMasterBridge`, `AppressLinkIntercept`,
-            // `AppressNotificationsFeed`, `AppressFirstLaunchBridge`,
-            // `AppressBiometricService`, …) under their salt-scrambled
-            // names; without this mirror the plugin's emitted
-            // `window.AppressNativeBridge.postMessage(…)` calls look
-            // for a handler that doesn't exist in the binary, so
-            // bridge calls silently no-op (biometric / indicators /
-            // status-bar JS dead). MUST run BEFORE the bare
-            // `window.Appress` substitution below so `Appress<Upper>`
-            // matches take priority — the bare-namespace regex's
-            // negative lookahead would otherwise be unaffected here
-            // (disjoint sets), but keeping this first defends against
-            // future regex tweaks.
+            // `<salt><hmac12(suffix)>`. Same HMAC-SHA256(salt, suffix)
+            // truncated to 12 hex as the mutator's `applyClassMutation`
+            // + `scrambleSuffix`. Native binary registers bridge
+            // handlers (`AppressNativeBridge`, `AppressMasterBridge`,
+            // `AppressLinkIntercept`, `AppressNotificationsFeed`,
+            // `AppressFirstLaunchBridge`, `AppressBiometricService`)
+            // under salt-scrambled names. MUST run BEFORE the bare
+            // `window.Appress` substitution below.
             $buffer = preg_replace_callback(
                 '/\bAppress([A-Z]\w*)/',
                 function ( $m ) use ( $ns ) {
@@ -107,23 +98,28 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
                 $buffer
             );
 
-            // `window.Appress` (negative lookahead on identifier char so
-            // any `Appress<Upper>` ref already rewritten above isn't
-            // double-touched).
+            // `window.Appress` bare namespace.
             $buffer = preg_replace(
                 '/\bwindow\.Appress(?![A-Za-z0-9_])/',
                 'window.' . $ns,
                 $buffer
             );
-            // Custom property names (definition + var() references).
+            // CSS custom property `--appress-status-bar-height` (both
+            // declaration and `var()` reference paths) — catches any
+            // inline `<style>` block in the HTML output. Bricks /
+            // Elementor / theme builders that COMPILE customer CSS to
+            // static `.css` files served by the web server bypass this
+            // buffer; those CSS payloads are caught by the matching
+            // mutation pass in `\Appress\get_app_css()` which rewrites
+            // before the CSS ships into the boot payload that the
+            // native side eventually injects into the WebView.
             $buffer = str_replace(
                 '--appress-status-bar-height',
                 '--' . $css_prefix . '-status-bar-height',
                 $buffer
             );
-            // CSS class tokens (selectors + element class="" attribute
-            // values). `\bappress-(sticky|status-bar-height)\b` so we
-            // don't accidentally rewrite `appress-app` etc.
+            // CSS class tokens (`.appress-sticky` selectors + element
+            // `class="appress-sticky"` attribute values).
             $buffer = preg_replace(
                 '/\bappress-(sticky|status-bar-height)\b/',
                 $css_prefix . '-$1',
