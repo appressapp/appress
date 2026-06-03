@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.25
+Stable tag: 1.0.0.26
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.26 =
+* Fixed status bar height resolving to 0 in the in-app Elementor / Bricks Status Bar Height widget.
+* Requires Build Engine v1.0.19+.
 
 = 1.0.0.25 =
 * Fixed in-app status bar height resolving to 0 when the customer's compiled stylesheet referenced `var(--appress-status-bar-height)`.

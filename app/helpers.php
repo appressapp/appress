@@ -362,23 +362,25 @@ function get_app_css( $app_id = 0 ) {
 		$out[ $key ] = (string) apply_filters( 'appress/app/css', $value, $platform, $app_id );
 	}
 
-	// Boundary mutation pass — rewrite `--appress-status-bar-height` +
-	// `.appress-sticky` / `.appress-status-bar-height` class tokens to
-	// the per-app salted forms. Build engine mutator does the same on
+	// Boundary mutation pass — rewrite `--appress-status-bar-height` to
+	// the per-app salted form. Build engine mutator does the same on
 	// every native CSS literal at compile time, so the runtime-injected
 	// var declaration in the WebView uses `--<salt_lc>-status-bar-height:
 	// 44px`. Without this matching pass on the plugin-emitted CSS the
 	// integration rules + admin-entered CSS reference the legacy literal
 	// var name → unresolved → falls back to `0px` → header drops under
 	// the notch. Uses the same per-app salt the binary was built with.
+	//
+	// HTML class names like `appress-status-bar-height` / `appress-sticky`
+	// stay literal here — they're used as targeting selectors by
+	// Elementor/Bricks/theme builder compiled CSS, salting would break
+	// those rules.
 	$salt = get_app_unique_class( $app_id );
 	if ( $salt !== '' ) {
 		$salt_lc = strtolower( $salt );
 		foreach ( $out as $key => $css ) {
 			if ( $css === '' ) continue;
-			$css = str_replace( '--appress-status-bar-height', '--' . $salt_lc . '-status-bar-height', $css );
-			$css = preg_replace( '/\bappress-(sticky|status-bar-height)\b/', $salt_lc . '-$1', $css );
-			$out[ $key ] = $css;
+			$out[ $key ] = str_replace( '--appress-status-bar-height', '--' . $salt_lc . '-status-bar-height', $css );
 		}
 	}
 

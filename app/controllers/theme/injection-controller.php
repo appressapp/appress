@@ -106,23 +106,24 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
             );
             // CSS custom property `--appress-status-bar-height` (both
             // declaration and `var()` reference paths) — catches any
-            // inline `<style>` block in the HTML output. Bricks /
-            // Elementor / theme builders that COMPILE customer CSS to
-            // static `.css` files served by the web server bypass this
-            // buffer; those CSS payloads are caught by the matching
-            // mutation pass in `\Appress\get_app_css()` which rewrites
-            // before the CSS ships into the boot payload that the
-            // native side eventually injects into the WebView.
+            // inline `<style>` block + inline `style="…"` attribute on
+            // the rendered HTML. CSS rules that reference the var from
+            // a STATIC `.css` file (Elementor compiled per-page CSS,
+            // theme stylesheets) bypass this buffer; for plugin-shipped
+            // static CSS the fix is to emit the rule inline at render
+            // time (see `Status_Bar_Height_Shortcode_Controller`). For
+            // CSS shipped via the boot/build payload, `get_app_css()`
+            // does the matching rewrite before the payload leaves PHP.
+            //
+            // HTML class names like `appress-status-bar-height` /
+            // `appress-sticky` are deliberately NOT mutated — Elementor
+            // compiles widget-level rules (e.g. per-widget background-
+            // color) to selectors like `{{WRAPPER}} .appress-status-bar-height`
+            // in its own per-page `.css` file; salting the rendered class
+            // would break those targeting rules. Class names kept literal.
             $buffer = str_replace(
                 '--appress-status-bar-height',
                 '--' . $css_prefix . '-status-bar-height',
-                $buffer
-            );
-            // CSS class tokens (`.appress-sticky` selectors + element
-            // `class="appress-sticky"` attribute values).
-            $buffer = preg_replace(
-                '/\bappress-(sticky|status-bar-height)\b/',
-                $css_prefix . '-$1',
                 $buffer
             );
             return $buffer;
