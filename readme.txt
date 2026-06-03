@@ -144,14 +144,15 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 == Changelog ==
 
 = 1.0.0.24 =
-* Fixed: the per-app namespace rewrite missed the native bridge handler names (used by biometric sign-in, indicator badges, smart banner, and the WooCommerce account integrations). Those handlers register in the app's binary under a per-build scrambled name, but the JavaScript the plugin emits was still calling them by the original `AppressNativeBridge` / `AppressMasterBridge` / `AppressLinkIntercept` / `AppressNotificationsFeed` etc. names — so the calls quietly no-op'd. The output filter now applies the same HMAC scramble the binary uses, so every bridge call resolves end-to-end. Required alongside Build Engine v1.0.18+.
+* Fixed in-app biometric sign-in, indicator badges, and smart banner regressing after 1.0.0.22.
+* Required alongside Build Engine v1.0.18+.
 
 = 1.0.0.23 =
-* Fixed: the per-app JS namespace and CSS variable names introduced in 1.0.0.22 were emitting with a duplicate "X" / "x" prefix that didn't match the binary side. The result was your in-app biometric / sticky / status-bar-height code never resolving the namespace and silently failing. Anyone who upgraded to 1.0.0.22 should upgrade to 1.0.0.23 right away.
+* Fixed in-app sticky and status-bar-height regression from 1.0.0.22.
 
 = 1.0.0.22 =
-* Every app built from this site now gets its own unique JavaScript namespace and CSS variable names so the App Store and Play Store can't lump your customers' apps together as "similar apps". Your existing biometric / sticky / status-bar-height code keeps working with no changes — the rewrite happens automatically only on requests coming from the native app.
-* Companion to Build Engine v1.0.18: this release MUST be live on every customer site before any v1.0.18-built app installs, otherwise the in-app calls won't resolve to the right namespace.
+* Each app built from this site now ships with its own unique JavaScript namespace and CSS variable names so the App Store and Play Store can no longer cluster your customers' apps as "similar apps".
+* Required alongside Build Engine v1.0.18+.
 
 = 1.0.0.21 =
 * Settings page restructured — the "Build Information" tab is now called "Build Config", and the separate "Live App Builder" tab has been retired. Everything you used to configure across both is now in one place. Your existing settings carry over automatically; no re-entry needed.
