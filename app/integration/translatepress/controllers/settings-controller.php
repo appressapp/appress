@@ -83,20 +83,20 @@ class Settings_Controller extends Base_Controller {
 		global $wpdb;
 		$table = $wpdb->prefix . 'appress_apps';
 		$row   = $wpdb->get_row(
-			$wpdb->prepare( "SELECT live_config FROM {$table} WHERE id = %d", $app_id ),
+			$wpdb->prepare( "SELECT build_config FROM {$table} WHERE id = %d", $app_id ),
 			ARRAY_A
 		);
 		if ( empty( $row ) ) {
 			return;
 		}
-		$live_config = ! empty( $row['live_config'] ) ? json_decode( $row['live_config'], true ) : [];
+		$live_config = ! empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 		if ( ! is_array( $live_config ) ) {
 			$live_config = [];
 		}
 		$live_config['update_time_hash'] = (string) time();
 		$wpdb->update(
 			$table,
-			[ 'live_config' => wp_json_encode( $live_config ) ],
+			[ 'build_config' => wp_json_encode( $live_config ) ],
 			[ 'id' => $app_id ]
 		);
 	}
@@ -128,7 +128,7 @@ class Settings_Controller extends Base_Controller {
 	private function build_localize(): array {
 		global $wpdb;
 		$rows = $wpdb->get_results(
-			"SELECT id, app_name, live_config FROM {$wpdb->prefix}appress_apps ORDER BY id ASC",
+			"SELECT id, app_name, build_config FROM {$wpdb->prefix}appress_apps ORDER BY id ASC",
 			ARRAY_A
 		);
 
@@ -138,7 +138,7 @@ class Settings_Controller extends Base_Controller {
 		$apps = [];
 		foreach ( (array) $rows as $row ) {
 			$app_id      = (int) $row['id'];
-			$live_config = ! empty( $row['live_config'] ) ? json_decode( $row['live_config'], true ) : [];
+			$live_config = ! empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 			if ( ! is_array( $live_config ) ) {
 				$live_config = [];
 			}
@@ -310,13 +310,13 @@ class Settings_Controller extends Base_Controller {
 	private function valid_tab_ids_for_app( int $app_id ): array {
 		global $wpdb;
 		$row = $wpdb->get_row(
-			$wpdb->prepare( "SELECT live_config FROM {$wpdb->prefix}appress_apps WHERE id = %d", $app_id ),
+			$wpdb->prepare( "SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d", $app_id ),
 			ARRAY_A
 		);
 		if ( ! $row ) {
 			return [];
 		}
-		$live_config = ! empty( $row['live_config'] ) ? json_decode( $row['live_config'], true ) : [];
+		$live_config = ! empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 		$ids         = [];
 		foreach ( (array) ( $live_config['bottom_navigation']['items'] ?? [] ) as $item ) {
 			if ( ! empty( $item['_id'] ) ) {

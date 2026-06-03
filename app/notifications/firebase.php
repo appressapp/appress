@@ -54,7 +54,7 @@ class Firebase {
 	private function init_messaging_for_app( $app_id ) {
 		global $wpdb;
 		$app_table = $wpdb->prefix . 'appress_apps';
-		$build_info_json = $wpdb->get_var( $wpdb->prepare( "SELECT build_information FROM {$app_table} WHERE id = %d", $app_id ) );
+		$build_info_json = $wpdb->get_var( $wpdb->prepare( "SELECT build_config FROM {$app_table} WHERE id = %d", $app_id ) );
 
 		if ( ! $build_info_json ) {
    /* translators: dynamic value injected into the message */
@@ -62,14 +62,14 @@ class Firebase {
 		}
 
 		$build_info = json_decode( $build_info_json, true ) ?: [];
-		// Service Account JSON: check credentials column first, fallback to build_information
+		// Service Account JSON: check credentials column first, fallback to build_config
 		$credentials = $wpdb->get_var( $wpdb->prepare( "SELECT credentials FROM {$app_table} WHERE id = %d", $app_id ) );
 		// Decrypt at-rest envelope (legacy plaintext rows pass through unchanged).
 		$credentials = \Appress\decrypt( (string) $credentials );
 		$creds = $credentials ? json_decode( $credentials, true ) : [];
 		$service_account_json = $creds['firebase_service_account'] ?? '';
 
-		// Fallback: try build_information (legacy)
+		// Fallback: try build_config (legacy)
 		if ( empty( $service_account_json ) ) {
 			$service_account_json = $build_info['firebase_android'] ?? $build_info['firebase-android'] ?? '';
 		}

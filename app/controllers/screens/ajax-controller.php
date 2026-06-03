@@ -80,7 +80,7 @@ class Ajax_Controller extends \Appress\Controllers\Base_Controller
 	/**
 	 * Create-or-resolve an `appress_screen` post.
 	 *
-	 * Behaves as "ensure exists" so the live-app-builder's Edit UI button
+	 * Behaves as "ensure exists" so the live-config's Edit UI button
 	 * can be unconditional — the client doesn't know whether `wp_id` on
 	 * the screen item points at a live post or a stale id (deleted /
 	 * trashed). Pass the row's `wp_id` when present:

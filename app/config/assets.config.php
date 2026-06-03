@@ -32,7 +32,6 @@ return [
 		'integrations.js',
 		'integration-events-panel.js',
 		'integration-translatepress.js',
-		'woocommerce-iap.js',
 		'broadcast.js',
 		'settings.js',
 	],

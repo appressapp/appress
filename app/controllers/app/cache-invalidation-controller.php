@@ -120,20 +120,20 @@ class Cache_Invalidation_Controller extends Base_Controller {
 		global $wpdb;
 		$table = $wpdb->prefix . 'appress_apps';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
-		$rows = $wpdb->get_results( "SELECT id, live_config FROM {$table}", ARRAY_A );
+		$rows = $wpdb->get_results( "SELECT id, build_config FROM {$table}", ARRAY_A );
 		if ( ! is_array( $rows ) ) {
 			return;
 		}
 		$stamp = (string) time();
 		foreach ( $rows as $row ) {
-			$cfg = ! empty( $row['live_config'] ) ? json_decode( (string) $row['live_config'], true ) : [];
+			$cfg = ! empty( $row['build_config'] ) ? json_decode( (string) $row['build_config'], true ) : [];
 			if ( ! is_array( $cfg ) ) {
 				$cfg = [];
 			}
 			$cfg['update_time_hash'] = $stamp;
 			$wpdb->update(
 				$table,
-				[ 'live_config' => wp_json_encode( $cfg ) ],
+				[ 'build_config' => wp_json_encode( $cfg ) ],
 				[ 'id' => (int) $row['id'] ]
 			);
 		}

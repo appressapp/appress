@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * Default "load in same screen, NOT a new subscreen" CSS selectors for
  * WooCommerce templates. Admin can always override / disable these via the
- * Live App Builder "Inline Link Selectors" field (or a custom filter).
+ * Live Config "Inline Link Selectors" field (or a custom filter).
  *
  * Each selector here corresponds to a navigation surface where WooCommerce
  * reuses the SAME page template across links. Pushing a fresh subscreen on

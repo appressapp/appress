@@ -215,7 +215,7 @@ function get_inline_link_selectors( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT live_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$live = $raw ? json_decode( $raw, true ) : [];
@@ -278,7 +278,7 @@ function get_subscreen_url_patterns( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT live_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$live = $raw ? json_decode( $raw, true ) : [];
@@ -336,7 +336,7 @@ function get_app_css( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT live_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$live = $raw ? json_decode( $raw, true ) : [];
@@ -508,7 +508,7 @@ function enqueue_integration_asset( string $integration_id, array $assets ): boo
  * state survives refreshes + browser history without client JS.
  *
  * @param string $integration_id  Current integration id.
- * @param array  $tabs        `[ 'events' => 'Events', 'iap' => 'In-App Purchase', ... ]`
+ * @param array  $tabs        `[ 'events' => 'Events', ... ]`
  * @param string $active      Key of the currently rendered tab.
  */
 function render_integration_tab_bar( string $integration_id, array $tabs, string $active ) {
@@ -516,10 +516,10 @@ function render_integration_tab_bar( string $integration_id, array $tabs, string
 	?>
 	<div class="bg-white dark:bg-white/[0.03] border border-gray-200 dark:border-gray-800 rounded-xl px-2 flex gap-1 mb-5">
 		<?php foreach ( $tabs as $key => $label ) :
-			// Labels accept two shapes so callers can attach a trailing
-			// badge (e.g. "Coming soon") without hand-rolling HTML:
-			//   'events' => 'Events'
-			//   'iap'    => [ 'text' => 'In-App Purchase', 'badge' => 'Coming soon' ]
+			// Labels accept two shapes:
+			//   string  → plain label
+			//   array   → ['text' => '...', 'badge' => '...']  for an
+			//             optional trailing pill (e.g. status / version)
 			$text  = is_array( $label ) ? (string) ( $label['text']  ?? '' ) : (string) $label;
 			$badge = is_array( $label ) ? (string) ( $label['badge'] ?? '' ) : '';
 			$href = esc_url( add_query_arg( 'tab', $key, $base ) );

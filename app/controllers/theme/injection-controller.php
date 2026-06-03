@@ -159,7 +159,7 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
         global $wpdb;
         $raw = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT live_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+                "SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
                 $app_id
             )
         );

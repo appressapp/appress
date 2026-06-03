@@ -49,11 +49,11 @@ class Smart_Banner_Controller extends \Appress\Controllers\Base_Controller {
 		// used by WP core itself for this construction.
 		$table = $wpdb->prefix . 'appress_apps';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
-		$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, app_name, build_information FROM {$table} WHERE id = %d", $app_id ), ARRAY_A );
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, app_name, build_config FROM {$table} WHERE id = %d", $app_id ), ARRAY_A );
 		if ( ! $row ) {
 			return null;
 		}
-		$bi = json_decode( (string) ( $row['build_information'] ?? '{}' ), true );
+		$bi = json_decode( (string) ( $row['build_config'] ?? '{}' ), true );
 		if ( ! is_array( $bi ) ) {
 			$bi = [];
 		}

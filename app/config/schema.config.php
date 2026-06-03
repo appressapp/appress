@@ -7,7 +7,7 @@ if ( ! defined('ABSPATH') ) {
 }
 
 return [
-	'build_information' => [
+	'build_config' => [
 		'fields' => [
 			'title' => [
 				'type' => 'text',
@@ -123,7 +123,7 @@ return [
 
 			// iOS signing — Apple Team ID. Required at build time to sign .ipa
 			// under the customer's Apple Developer account. Kept in
-			// build_information (plaintext) rather than credentials because the
+			// build_config (plaintext) rather than credentials because the
 			// value is public-identifier grade (it appears in every signed
 			// .ipa anyway) and the Build Engine needs it in the main build
 			// payload, not the encrypted credentials column.
@@ -141,7 +141,7 @@ return [
 
 
 		
-			// package_id stays inside build_information JSON — the Build Engine
+			// package_id stays inside build_config JSON — the Build Engine
 			// reads it from the payload as part of the app config. It's a
 			// public identifier (bundle ID baked into every signed binary),
 			// so storing plaintext here is fine.
@@ -172,7 +172,7 @@ return [
 				],
 			],
 			// app_version + build_number are collected in the Build modal
-			// (not in the main form) but must persist in build_information
+			// (not in the main form) but must persist in build_config
 			// so request_build can ship them. Without these schema entries,
 			// save_config drops them silently — user types 1.2.5 build 10,
 			// Build Engine receives 1.0.0 build 1.
@@ -321,14 +321,52 @@ return [
 				]
 			],
 
+			// Subscreen — when enabled, link taps open the destination in a
+			// pushed modal screen (slide-from-right) instead of replacing
+			// the current WebView's URL. Disabling collapses that whole
+			// secondary stack: clicks always replace the active WebView's
+			// URL, no slide animation, no per-screen back stack, no
+			// standalone container in the native layout. Disabled apps
+			// also ship without the push/pop machinery in the binary —
+			// reduces code surface for apps that want a simpler in-place
+			// nav model (single-screen storefronts, in-app browsers).
+			'subscreen' => [
+				'type' => 'object',
+				'label' => __( 'Subscreen', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Open links in a subscreen', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'hint' => __( 'When OFF, link taps replace the current page in-place instead of pushing a modal subscreen on top.', 'appress' ),
+							'doc_url' => 'https://docs.appress.app/native-features/subscreen'
+						]
+					],
+				]
+			],
+
 			// connection_token + central_app_id intentionally NOT declared
 			// here. They live in their own DB columns (connection_token is
 			// encrypted). Declaring them would also duplicate the values
 			// into this plaintext JSON, leaking the token at rest.
-		]
-	],
-	'live_config' => [
-		'fields' => [
+
+			// ============================================================
+			//   MOVED FROM live_config (2026-06-02 — bake-everything refactor)
+			//   Everything below ships into the compiled app binary at build
+			//   time. The Build Engine reads this JSON, embeds it into
+			//   AppressBakedConfig.{swift,java} as a string literal, and the
+			//   native runtime boots from the constant — no runtime fetch
+			//   of `app.boot` across customer apps. Live updates touch only
+			//   the (now-trimmed) `live_config` block: analytics + smart
+			//   prefetch + inline-link / subscreen URL patterns.
+			// ============================================================
+
+			// ── Custom CSS injected into every WebView ───────────────────
 			'css_all' => [
 				'type' => 'textarea',
 				'label' => __( 'Custom CSS (Global)', 'appress' ),
@@ -350,6 +388,8 @@ return [
 				'default' => '',
 				'ui' => [ 'group' => 'custom_css', 'placeholder' => '/* iOS specific */' ]
 			],
+
+			// ── Bottom Navigation ────────────────────────────────────────
 			'bottom_navigation' => [
 				'type' => 'object',
 				'label' => __( 'Bottom Navigation', 'appress' ),
@@ -360,7 +400,7 @@ return [
 					// Toggles
 					'hide_on_scroll' => [ 'type' => 'boolean', 'label' => __( 'Hide on Scroll', 'appress' ), 'sanitize' => 'boolean', 'default' => true, 'ui' => [ 'group' => 'nav_toggles' ] ],
 					'active_item_top_border' => [ 'type' => 'boolean', 'label' => __( 'Active item top border', 'appress' ), 'sanitize' => 'boolean', 'default' => true, 'ui' => [ 'group' => 'nav_toggles' ] ],
-					'show_on_subscreen' => [ 'type' => 'boolean', 'label' => __( 'Show on subscreen', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'nav_toggles', 'hint' => __( 'Keep the bottom nav visible when a subscreen is pushed on top of a tab.', 'appress' ) ] ],
+					'show_on_subscreen' => [ 'type' => 'boolean', 'label' => __( 'Show on subscreen', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'nav_toggles', 'hint' => __( 'Keep the bottom nav visible when a subscreen is pushed on top of a tab.', 'appress' ), 'show_if' => 'subscreen.enabled' ] ],
 					// Colors
 					'background_color' => [ 'type' => 'color', 'label' => __( 'Background Color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'nav_colors' ] ],
 					'active_color' => [ 'type' => 'color', 'label' => __( 'Active Color', 'appress' ), 'sanitize' => 'text', 'default' => '#000000', 'ui' => [ 'group' => 'nav_colors' ] ],
@@ -406,18 +446,8 @@ return [
 							'type' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'screen' ],
 							'screen_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 							'url' => [ 'type' => 'url', 'sanitize' => 'url', 'default' => '' ],
-							// Which drawer this item opens when type === 'menu_toggle'.
-							// 'left'  → opens the Left Side Menu  (action: open_side_menu)
-							// 'right' → opens the Right Side Menu (action: open_right_menu)
-							// Default 'left' so items configured before 2026-05-15 keep
-							// their original single-drawer behavior.
 							'menu_target' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'left' ],
 							'indicator' => [ 'type' => 'select', 'sanitize' => 'text', 'default' => 'none' ],
-							// Per-item indicator override — lets customer tone
-							// down less-critical badges (e.g. cart = subtle
-							// gray) while keeping important ones loud (e.g.
-							// notifications = red). Empty values fall back to
-							// the global default from default_config.
 							'custom_indicator_style'     => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false ],
 							'indicator_background_color' => [ 'type' => 'color', 'sanitize' => 'text', 'default' => '' ],
 							'indicator_color'            => [ 'type' => 'color', 'sanitize' => 'text', 'default' => '' ],
@@ -425,7 +455,8 @@ return [
 					]
 				]
 			],
-			// ── Default Configuration (toggles first, then colors) ──
+
+			// ── Default Configuration (toggles first, then colors) ───────
 			'pull_to_refresh' => [
 				'type' => 'boolean',
 				'label' => __( 'Pull to Refresh', 'appress' ),
@@ -458,42 +489,8 @@ return [
 					'maxlength' => 80,
 				]
 			],
-			'google_analytics_id' => [
-				'type' => 'text',
-				'label' => __( 'Google Analytics Measurement ID', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [ 'group' => 'analytics', 'placeholder' => 'G-XXXXXXXXXX' ]
-			],
-			'exclude_all_web_ga' => [
-				'type' => 'boolean',
-				'label' => __( 'Exclude ALL web Google Analytics inside this app', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => true,
-				'ui' => [ 'group' => 'analytics', 'hint' => __( 'Block every gtag / GA4 script the website loads so traffic is not double-counted.', 'appress' ) ]
-			],
-			'exclude_web_ga_ids' => [
-				'type' => 'textarea',
-				'label' => __( 'Specific GA4 / gtag IDs to exclude', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [ 'group' => 'analytics', 'placeholder' => "G-WEB_ONE\nG-WEB_TWO", 'hint' => __( 'One ID per line. Only used when the switch above is OFF.', 'appress' ), 'show_if' => '!exclude_all_web_ga' ]
-			],
-			// ────────────────────────────────────────────────────────────────
-			//   LEFT SIDE MENU
-			//   Internal field name kept as `side_menu` for backward compat
-			//   with apps shipped before 2026-05-15 when this was the only
-			//   drawer. Always anchored to the LEFT edge.
-			// ────────────────────────────────────────────────────────────────
-			// Slide-in drawer loading the App Screen marked with role="menu".
-			// WebView approach: customer designs the menu on their site (user
-			// profile, avatar, account links, conditional content based on
-			// login state) on a screen, marks it with the "Menu Screen" role,
-			// and the drawer reuses that screen's URL + reload behavior. Drawer
-			// pushes the whole app layout sideways (bottom nav included) so it
-			// reveals cleanly. Triggered by: edge swipe, bottom nav item with
-			// type=menu_toggle, or any element with class `.appress-open-menu`
-			// inside the web content (intercepted by the native bridge JS).
+
+			// ── Left Side Menu ───────────────────────────────────────────
 			'side_menu' => [
 				'type' => 'object',
 				'label' => __( 'Left Side Menu', 'appress' ),
@@ -506,19 +503,7 @@ return [
 				]
 			],
 
-			// ────────────────────────────────────────────────────────────────
-			//   RIGHT SIDE MENU (added 2026-05-15)
-			// ────────────────────────────────────────────────────────────────
-			// Optional second drawer anchored on the right edge. Use case:
-			// separate user-account context (profile, messages, notifications,
-			// logout) from site navigation (categories, pages) — common pattern
-			// in messaging / social apps. Mirrors `side_menu` config minus the
-			// `position` field (always anchored right).
-			//
-			// Default disabled — apps shipped before 2026-05-15 will keep their
-			// single-menu behavior. Schema is additive, so payloads from older
-			// engines (no `right_menu` key) flow through harmlessly and the
-			// mobile-app code feature-detects this field's presence.
+			// ── Right Side Menu ──────────────────────────────────────────
 			'right_menu' => [
 				'type' => 'object',
 				'label' => __( 'Right Side Menu', 'appress' ),
@@ -531,13 +516,7 @@ return [
 				]
 			],
 
-			// First-launch screen — fires once, on the very first cold-start
-			// after install. Mirrors Side Menu config shape (URL | App Screen).
-			// Typical use: onboarding slider, TOS accept, permission priming
-			// before the OS push-permission modal. Admin designs the page in
-			// WordPress with any builder; native just opens it as a full-screen
-			// modal and flips `has_launched=true` in local storage so it never
-			// shows again on the device. Reinstall clears the flag.
+			// ── First Launch Screen ──────────────────────────────────────
 			'first_launch' => [
 				'type' => 'object',
 				'label' => __( 'First Launch Screen', 'appress' ),
@@ -565,13 +544,7 @@ return [
 				]
 			],
 
-			// Auth gate — when enabled, the native runtime refuses to render
-			// tabs / bottom nav / side menu on cold start until the user is
-			// logged in. Only the First Launch Screen (if configured) and the
-			// screen with `role=auth` are visible. Once the login cookie
-			// (`wordpress_logged_in_*`) appears, the gate tears down and the
-			// normal layout bootstraps. Designed for apps that are login-only
-			// (members-only communities, internal tools).
+			// ── Auth Gate ────────────────────────────────────────────────
 			'require_auth_to_open' => [
 				'type' => 'boolean',
 				'label' => __( 'Require authentication to open the app', 'appress' ),
@@ -584,222 +557,19 @@ return [
 				]
 			],
 
-			// ── In-App Purchase (StoreKit / Google Play Billing) ─────────
-			// Platform-level master switches. When off, the Appress IAP
-			// gateway + native purchase flow are bypassed — carts with
-			// IAP-flagged products fall through to regular web checkout
-			// (Stripe / COD / etc.). Apple / Google REQUIRE IAP for digital
-			// content; flipping these on is how the admin signals "yes, I
-			// have ticked all the Apple/Google prerequisites — ship it".
-			//
-			// Prerequisites that the admin has to handle OUTSIDE Appress:
-			//   iOS      — Paid Applications Agreement signed, each product
-			//              created in App Store Connect with matching product id
-			//   Android  — Merchant account linked, each product created in
-			//              Play Console, service account granted "View
-			//              financial data" + "Manage orders" (on top of
-			//              the existing Release Manager role used for
-			//              publishing).
-			'iap_enabled_ios' => [
-				'type' => 'boolean',
-				'label' => __( 'Enable In-App Purchase (iOS)', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => false,
-				'ui' => [
-					'group' => 'iap',
-					'col_span' => 1,
-					'hint' => __( 'Route digital-content purchases through StoreKit. Required by Apple for non-physical goods. Needs App Store Connect products + Paid Applications Agreement signed.', 'appress' )
-				]
-			],
-			'iap_enabled_android' => [
-				'type' => 'boolean',
-				'label' => __( 'Enable In-App Purchase (Android)', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => false,
-				'ui' => [
-					'group' => 'iap',
-					'col_span' => 1,
-					'hint' => __( 'Route digital-content purchases through Google Play Billing. Required by Google for non-physical goods. Needs Play Console products + service account granted financial roles.', 'appress' )
-				]
-			],
-			'iap_sandbox' => [
-				'type' => 'boolean',
-				'label' => __( 'Sandbox mode', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => true,
-				'ui' => [
-					'group' => 'iap',
-					'col_span' => 2,
-					'hint' => __( 'Verify purchases against Apple / Google sandbox endpoints (tester accounts, no real money). Turn OFF for production builds AFTER confirming the full purchase → verify → order-complete flow works end-to-end.', 'appress' )
-				]
-			],
-			// Admin-UX niceties: let the per-product mapping panel deep-
-			// link into the exact IAP section of each store's console.
-			// Bundle ID / package name isn't enough — Apple + Google use
-			// internal numeric ids in their URLs, which the admin has to
-			// grab once (visible in the browser URL bar when they're in
-			// the console for that app). Optional — empty values fall
-			// back to the generic landing page.
-			'iap_apple_app_id' => [
-				'type' => 'text',
-				'label' => __( 'App Store Connect numeric App ID', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [
-					'group' => 'iap',
-					'col_span' => 1,
-					'placeholder' => '1234567890',
-					'hint' => __( 'Optional. Numeric ID Apple assigns when you create the app in App Store Connect — visible in the URL: `appstoreconnect.apple.com/apps/<b>1234567890</b>/…`. When set, the IAP mapping UI deep-links straight into the In-App Purchases section.', 'appress' )
-				]
-			],
-			'iap_google_play_app_id' => [
-				'type' => 'text',
-				'label' => __( 'Play Console internal App ID', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [
-					'group' => 'iap',
-					'col_span' => 1,
-					'placeholder' => '4976237481231234567',
-					'hint' => __( 'Optional. Long numeric ID visible in the Play Console URL: `play.google.com/console/u/0/developers/NNN/app/<b>MMM</b>/app-dashboard`. When set, the IAP mapping UI deep-links straight into Managed products / Subscriptions.', 'appress' )
-				]
-			],
-			'iap_google_play_developer_id' => [
-				'type' => 'text',
-				'label' => __( 'Play Console Developer ID', 'appress' ),
-				'sanitize' => 'text',
-				'default' => '',
-				'ui' => [
-					'group' => 'iap',
-					'col_span' => 2,
-					'placeholder' => '8147632009876543210',
-					'hint' => __( 'Optional. Long numeric ID from `play.google.com/console/u/0/developers/<b>NNN</b>/app/…`. Required alongside the app id for Play Console deep-links to work.', 'appress' )
-				]
-			],
-
-			// ── Smart prefetch (server-side Cache-Control relax) ────────
-			// The native slave WebViews inject a JS snippet that silently
-			// fetches anchor targets entering the viewport (see
-			// `AppressSlaveJSService.prefetchOnVisibleJS`). That warm-up
-			// only speeds up subsequent taps if the server allows the
-			// response to be cached — WordPress' default `no-store,
-			// no-cache` for logged-in users would throw the prefetched
-			// body away. These two fields let the admin relax Cache-
-			// Control per-app, scoped to requests coming from the app
-			// (UA check via `\Appress\is_app()`) and to paths that are
-			// safe to briefly cache. Cart / checkout / account paths
-			// keep `no-store` so live state stays fresh.
-			'prefetch_cache_duration' => [
-				'type' => 'number',
-				'label' => __( 'Prefetch cache duration (seconds)', 'appress' ),
-				'sanitize' => 'number',
-				'default' => 300,
-				'ui' => [
-					'group' => 'prefetch',
-					'col_span' => 1,
-					'placeholder' => '300',
-					'hint' => __( 'How long the WebView keeps a prefetched page in its HTTP cache', 'appress' )
-				]
-			],
-			'prefetch_cache_exclude_paths' => [
-				'type' => 'textarea',
-				'label' => __( 'Paths excluded from prefetch caching', 'appress' ),
-				'sanitize' => 'textarea',
-				'default' => "/cart\n/checkout\n/my-account\n/wp-admin\n/wp-login.php\n?add-to-cart=\n?logout=",
-				'ui' => [
-					'group' => 'prefetch',
-					'col_span' => 1,
-					'placeholder' => "/cart\n/checkout\n/my-account",
-					'hint' => __( 'One path fragment per line', 'appress' )
-				]
-			],
-
-			// Links whose targets should load INSIDE the current screen instead
-			// of pushing a new subscreen modal. Admins enter one CSS selector
-			// per line (e.g. `.woocommerce-MyAccount-navigation a`). PHP
-			// integrations contribute additional selectors at runtime via the
-			// `appress/app/inline_link_selectors` filter — see
-			// `integration/woocommerce/controllers/inline-links-controller.php`
-			// for the default Woo set. Stored as textarea (raw newline-
-			// separated) so admins can paste freely; the boot endpoint
-			// normalizes to an array and merges with the filter.
-			'inline_link_selectors' => [
-				'type' => 'textarea',
-				'label' => __( 'Stay-on-page link selectors', 'appress' ),
-				'sanitize' => 'textarea',
-				'default' => '',
-				'ui' => [
-					'group' => 'inline_links',
-					'col_span' => 2,
-					'placeholder' => ".my-tabs a\n#sub-nav a",
-					'hint' => __( 'One CSS selector per line.', 'appress' ),
-				],
-			],
-
-			// URL patterns whose targets should ALWAYS open in a new
-			// subscreen, overriding the default in-place behaviour for
-			// JS-driven navigations (search forms, archive filters, …).
-			// Mirrors `inline_link_selectors` but operates on the
-			// destination URL instead of the click element — catches
-			// keyboard Enter on search inputs, programmatic
-			// `window.location.href` calls, and notification deep-links
-			// uniformly (click-based selectors would miss those paths).
-			//
-			// Glob syntax: `*` = any chars, `?` = one char. Tested
-			// against pathname + querystring. Examples:
-			//   `/listings/*`
-			//   `/?s=*`
-			//   `*?orderby=*`
-			//
-			// Integrations contribute defaults via the
-			// `appress/app/subscreen_url_patterns` filter — see
-			// `integration/voxel/controllers/subscreen-patterns-controller.php`
-			// for the Voxel archive/page submit auto-detection.
-			//
-			// Conflict resolution: if a click on an element matching
-			// `inline_link_selectors` targets a URL also matching
-			// `subscreen_url_patterns`, the element selector WINS (in-place).
-			// Reasoning: admin's element-specific intent is more precise than
-			// a URL-pattern blanket. The native interceptor checks element
-			// match first; URL pattern only fires when no inline-link match.
-			'subscreen_url_patterns' => [
-				'type' => 'textarea',
-				'label' => __( 'Open in subscreen (URL patterns)', 'appress' ),
-				'sanitize' => 'textarea',
-				'default' => '',
-				'ui' => [
-					'group' => 'inline_links',
-					'col_span' => 2,
-					'placeholder' => "/?s=*\n/listings/*\n*?orderby=*",
-					'hint' => __( 'One URL pattern per line. * matches any characters. Auto-applied to Voxel post-type archives.', 'appress' ),
-				],
-			],
-
+			// ── App Screens (tabs + standalone) ──────────────────────────
 			'app_screens' => [
 				'type' => 'repeater',
 				'label' => __( 'App Screens', 'appress' ),
 				'sanitize' => 'repeater',
 				'default' => [],
 				'fields' => [
-					// Identity / routing keys — never rendered as form controls,
-					// populated by the repeater's header (add-screen dropdown,
-					// WP post picker, URL field). Kept in schema so sanitize +
-					// whitelist accept them on save.
 					'_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 					'wp_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 					'type' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'custom_url' ],
 					'title' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 					'url' => [ 'type' => 'text', 'sanitize' => 'url', 'default' => '' ],
 					'icon' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
-					// Screen role — a single enum tag for "named" surfaces in
-					// the app (home / auth / notifications / menu). Cross-item
-					// exclusivity (only one screen per non-none role) is enforced
-					// by the Vue repeater on save — schema-level sanitize doesn't
-					// see the sibling rows. Native consumers resolve a role to a
-					// URL by scanning `app_screens` for the row with the matching
-					// role, which frees the admin from pasting the same URL into
-					// multiple settings (default screen, auth gate, push deep
-					// links, etc.).
 					'role' => [
 						'type' => 'select', 'sanitize' => 'text', 'default' => 'none',
 						'label' => __( 'Screen Role', 'appress' ),
@@ -810,12 +580,7 @@ return [
 								[ 'value' => 'home',          'label' => __( 'Homescreen',          'appress' ) ],
 								[ 'value' => 'auth',          'label' => __( 'Auth Screen',         'appress' ) ],
 								[ 'value' => 'notifications', 'label' => __( 'Notification Screen', 'appress' ) ],
-								// Backward compat: "Menu Screen" is the LEFT side menu's
-								// content source. Pre-2026-05-15 this was simply "the menu".
 								[ 'value' => 'menu',          'label' => __( 'Left Menu Screen',    'appress' ) ],
-								// Added 2026-05-15 for the optional right-side drawer.
-								// Apps that never enable `right_menu` ignore this role
-								// → backward compat preserved.
 								[ 'value' => 'right_menu',    'label' => __( 'Right Menu Screen',   'appress' ) ],
 							]
 						]
@@ -962,6 +727,92 @@ return [
 					'hint' => __( 'Add any extra ad-serving hostnames not covered by the presets above. Paths are not supported — hostnames only.', 'appress' )
 				]
 			],
+
+			// ════════════════════════════════════════════════════════════
+			//   ABSORBED FROM former `live_config` category (2026-06-02 v2)
+			//   Customer apps boot from baked config and never re-fetch at
+			//   runtime, so the historical "runtime-mutable" split was
+			//   meaningless — every customer-facing change requires a
+			//   rebuild anyway. Collapsed into build_config so the schema
+			//   matches the actual lifecycle.
+			// ════════════════════════════════════════════════════════════
+
+			// ── Analytics ───────────────────────────────────────────────
+			'google_analytics_id' => [
+				'type' => 'text',
+				'label' => __( 'Google Analytics Measurement ID', 'appress' ),
+				'sanitize' => 'text',
+				'default' => '',
+				'ui' => [ 'group' => 'analytics', 'placeholder' => 'G-XXXXXXXXXX' ]
+			],
+			'exclude_all_web_ga' => [
+				'type' => 'boolean',
+				'label' => __( 'Exclude ALL web Google Analytics inside this app', 'appress' ),
+				'sanitize' => 'boolean',
+				'default' => true,
+				'ui' => [ 'group' => 'analytics', 'hint' => __( 'Block every gtag / GA4 script the website loads so traffic is not double-counted.', 'appress' ) ]
+			],
+			'exclude_web_ga_ids' => [
+				'type' => 'textarea',
+				'label' => __( 'Specific GA4 / gtag IDs to exclude', 'appress' ),
+				'sanitize' => 'text',
+				'default' => '',
+				'ui' => [ 'group' => 'analytics', 'placeholder' => "G-WEB_ONE\nG-WEB_TWO", 'hint' => __( 'One ID per line. Only used when the switch above is OFF.', 'appress' ), 'show_if' => '!exclude_all_web_ga' ]
+			],
+
+			// ── Smart prefetch (server-side Cache-Control relax) ────────
+			'prefetch_cache_duration' => [
+				'type' => 'number',
+				'label' => __( 'Prefetch cache duration (seconds)', 'appress' ),
+				'sanitize' => 'number',
+				'default' => 300,
+				'ui' => [
+					'group' => 'prefetch',
+					'col_span' => 1,
+					'placeholder' => '300',
+					'hint' => __( 'How long the WebView keeps a prefetched page in its HTTP cache', 'appress' )
+				]
+			],
+			'prefetch_cache_exclude_paths' => [
+				'type' => 'textarea',
+				'label' => __( 'Paths excluded from prefetch caching', 'appress' ),
+				'sanitize' => 'textarea',
+				'default' => "/cart\n/checkout\n/my-account\n/wp-admin\n/wp-login.php\n?add-to-cart=\n?logout=",
+				'ui' => [
+					'group' => 'prefetch',
+					'col_span' => 1,
+					'placeholder' => "/cart\n/checkout\n/my-account",
+					'hint' => __( 'One path fragment per line', 'appress' )
+				]
+			],
+
+			// ── Page routing overrides ──────────────────────────────────
+			'inline_link_selectors' => [
+				'type' => 'textarea',
+				'label' => __( 'Stay-on-page link selectors', 'appress' ),
+				'sanitize' => 'textarea',
+				'default' => '',
+				'ui' => [
+					'group' => 'inline_links',
+					'col_span' => 2,
+					'placeholder' => ".my-tabs a\n#sub-nav a",
+					'hint' => __( 'One CSS selector per line.', 'appress' ),
+					'show_if' => 'subscreen.enabled',
+				],
+			],
+			'subscreen_url_patterns' => [
+				'type' => 'textarea',
+				'label' => __( 'Open in subscreen (URL patterns)', 'appress' ),
+				'sanitize' => 'textarea',
+				'default' => '',
+				'ui' => [
+					'group' => 'inline_links',
+					'col_span' => 2,
+					'placeholder' => "/?s=*\n/listings/*\n*?orderby=*",
+					'hint' => __( 'One URL pattern per line. * matches any characters.', 'appress' ),
+					'show_if' => 'subscreen.enabled',
+				],
+			],
 		]
 	],
 	'credentials' => [
@@ -1083,12 +934,10 @@ return [
 			],
 
 			// ── Android — Google Play Developer API service account ──
-			// One service account, two downstream uses:
-			//   1. Auto-publish AAB to Play Store tracks (needs Release Manager role).
-			//   2. Verify IAP receipts via Android Publisher API (needs View
-			//      Financial Data + Manage Orders on top of Release Manager).
-			// Grant all three roles up-front so enabling IAP later doesn't
-			// require the admin to re-generate or re-link the key.
+			// Auto-publish AAB to Play Store tracks. Single role required:
+			// Release Manager. Optional but recommended — admins who skip
+			// this still get a buildable AAB they can upload manually via
+			// Play Console.
 			'google_play_service_account_json' => [
 				'type' => 'file_drag_drop',
 				'label' => __( 'Google Play Service Account JSON', 'appress' ),
@@ -1099,7 +948,7 @@ return [
 					'col_span' => 2,
 					'accept' => '.json',
 					'filename' => 'play-service-account.json',
-					'hint' => __( 'Play Console → Setup → API access → Service accounts. Grant roles: Release Manager (auto-publish AAB) + View Financial Data + Manage Orders (required for In-App Purchase receipt verification).', 'appress' )
+					'hint' => __( 'Play Console → Setup → API access → Service accounts. Grant Release Manager role to enable auto-publish of AAB builds.', 'appress' )
 				]
 			],
 		]

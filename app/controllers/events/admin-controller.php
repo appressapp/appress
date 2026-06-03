@@ -19,8 +19,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Admin_Controller extends Base_Controller {
 
 	protected function hooks() {
-		// Events UI lives inside the Integrations page (tabs: Overview /
-		// Events / IAP). The AJAX endpoints stay here because they're
+		// Events UI lives inside the Integrations page (Events tab).
+		// The AJAX endpoints stay here because they're
 		// the data source the unified view reads — integration plugins
 		// register their schema against the same `appress/events`
 		// filter the `admin.events.schema` handler resolves below.
@@ -47,13 +47,13 @@ class Admin_Controller extends Base_Controller {
 			$this->check_permissions();
 			global $wpdb;
 			$table = $wpdb->prefix . 'appress_apps';
-			// package_id lives inside build_information JSON — mirror broadcast admin-controller pattern
-			$apps  = $wpdb->get_results( "SELECT id, app_name, build_information FROM {$table} ORDER BY created_at DESC", ARRAY_A );
+			// package_id lives inside build_config JSON — mirror broadcast admin-controller pattern
+			$apps  = $wpdb->get_results( "SELECT id, app_name, build_config FROM {$table} ORDER BY created_at DESC", ARRAY_A );
 
 			$formatted = [];
 			if ( $apps ) {
 				foreach ( $apps as $app ) {
-					$build_info = json_decode( $app['build_information'] ?? '{}', true ) ?: [];
+					$build_info = json_decode( $app['build_config'] ?? '{}', true ) ?: [];
 					$formatted[] = [
 						'id'         => (int) $app['id'],
 						'app_name'   => $app['app_name'],

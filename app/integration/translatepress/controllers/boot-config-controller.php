@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *       en_US: {
  *         host:   "https://site.com",               // shortcut accessor
  *         config: {                                  // mergeable override
- *           build_information: { website_url },
+ *           build_config: { website_url },
  *           bottom_navigation: { items: [ ... ] },   // full translated array
  *           app_screens:       [ ... ],              // full translated array
  *           first_launch:      { url }
@@ -143,8 +143,8 @@ class Boot_Config_Controller extends Base_Controller {
 			'default'          => (string) $settings['default_language'],
 			'languages'        => (array) $settings['languages'],
 			'labels'           => $labels,
-			'website'          => isset( $live_config['build_information']['website_url'] )
-				? (string) $live_config['build_information']['website_url']
+			'website'          => isset( $live_config['build_config']['website_url'] )
+				? (string) $live_config['build_config']['website_url']
 				: home_url(),
 			'nav_items'        => (array) ( $live_config['bottom_navigation']['items'] ?? [] ),
 			'screens'          => (array) ( $live_config['app_screens'] ?? [] ),
@@ -168,7 +168,7 @@ class Boot_Config_Controller extends Base_Controller {
 	 */
 	private function build_variant_config( string $code, array $ctx ): array {
 		$config = [
-			'build_information' => [
+			'build_config' => [
 				'website_url' => $this->resolve_host( $code, $ctx ),
 			],
 			'bottom_navigation' => [
@@ -188,7 +188,7 @@ class Boot_Config_Controller extends Base_Controller {
 
 	/**
 	 * Translated bottom-nav items. Only `title` is language-dependent
-	 * here — the Live App Builder UI for bottom nav offers `screen`
+	 * here — the Live Config UI for bottom nav offers `screen`
 	 * (linked via screen_id to an app_screens row) and `menu_toggle`
 	 * (opens the side menu drawer). Neither path uses tab.url, so the
 	 * url field is left untouched. URL translation for tab destinations
@@ -255,7 +255,7 @@ class Boot_Config_Controller extends Base_Controller {
 
 	/**
 	 * Per-language root host. Default language anchors on the admin-typed
-	 * `build_information.website_url` so it matches what admins entered
+	 * `build_config.website_url` so it matches what admins entered
 	 * in App Information, even when TRP's
 	 * `add-subdirectory-to-default-language=yes` would otherwise inject
 	 * a redundant `/en` prefix. Non-default langs route through TRP.

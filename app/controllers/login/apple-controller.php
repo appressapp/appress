@@ -74,7 +74,7 @@ class Apple_Controller extends \Appress\Controllers\Base_Controller {
 			}
 
 			// Validate `aud` against the bundle id of the customer's
-			// app, which we read from `wp_appress_apps.build_information`.
+			// app, which we read from `wp_appress_apps.build_config`.
 			// Apple sets `aud` to the bundle id for native sign-in
 			// (ASAuthorizationAppleIDProvider) and to the configured
 			// Service ID for web sign-in. Native is the only path the
@@ -86,12 +86,12 @@ class Apple_Controller extends \Appress\Controllers\Base_Controller {
 			// triggered Plugin Check's `DirectDB.UnescapedDBParameter`
 			// false positive (it tracks the variable assignment but
 			// can't see the prefix's provenance).
-			$row   = $wpdb->get_row( $wpdb->prepare( "SELECT build_information FROM {$wpdb->prefix}appress_apps WHERE id = %d LIMIT 1", $app_id ) );
+			$row   = $wpdb->get_row( $wpdb->prepare( "SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d LIMIT 1", $app_id ) );
 			if ( ! $row ) {
 				/* translators: %s: app id sent in the request */
 				throw new \Exception( esc_html( sprintf( __( 'App not found. ID sent: %s', 'appress' ), $app_id ) ) );
 			}
-			$build_info = json_decode( $row->build_information ?? '{}', true ) ?: [];
+			$build_info = json_decode( $row->build_config ?? '{}', true ) ?: [];
 
 			$allowed_aud = [];
 			if ( ! empty( $build_info['package_id'] ) ) {

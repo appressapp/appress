@@ -21,7 +21,7 @@ if (! defined('ABSPATH')) {
  * every app launch.
  *
  * Endpoint: /?appress=1&action=app.boot&app_id=15&version=<hash>
- *   - Returns the Live App Builder config.
+ *   - Returns the merged build_config + live_config payload.
  *   - Schedules an async `appress/app/booted` hook in WP-Cron for extensions
  *     (last-active tracking, Automator triggers, analytics) to piggyback on
  *     without delaying the native response.
@@ -135,7 +135,7 @@ class Frontend_Controller extends Base_Controller
 	 * URLs, public Firebase project IDs, ad unit IDs. There is no
 	 * user-specific data and no secret material; admin-only credentials
 	 * (signing keys, service account JSON, keystore passwords) live in a
-	 * separate `build_information` column that is NEVER returned by this
+	 * separate `build_config` column that is NEVER returned by this
 	 * handler. A standard WordPress nonce isn't applicable to a stateless
 	 * mobile client; the response is rate-limited at the platform layer
 	 * (cache headers + WP-cron throttling on the async hook below).
@@ -149,13 +149,19 @@ class Frontend_Controller extends Base_Controller
 			}
 
 			global $wpdb;
-			$row = $wpdb->get_row( $wpdb->prepare("SELECT live_config FROM {$wpdb->prefix}appress_apps WHERE id = %d", $app_id), ARRAY_A );
+			$row = $wpdb->get_row( $wpdb->prepare("SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d", $app_id), ARRAY_A );
 
 			if ( ! $row ) {
 				throw new \Exception( esc_html__( 'Application not found.', 'appress' ) );
 			}
 
-			$live_config = !empty($row['live_config']) ? json_decode($row['live_config'], true) : [];
+			// 1.3.0 collapsed live_config into build_config — customer apps
+			// never re-fetch at runtime so the runtime-mutable split was
+			// imaginary. Variable is still named `$live_config` because the
+			// downstream filter hook contract (`appress/app/live_config`)
+			// and the response key (`data`) are part of the public boot
+			// payload shape; renaming them is a separate breaking change.
+			$live_config = !empty($row['build_config']) ? (array) json_decode($row['build_config'], true) : [];
  
 			$client_version = isset($_GET['version']) ? sanitize_text_field(wp_unslash($_GET['version'])) : '0';
  

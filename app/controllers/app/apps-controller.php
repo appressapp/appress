@@ -148,7 +148,7 @@ class Apps_Controller extends Base_Controller {
 			$table = $wpdb->prefix . 'appress_apps';
 
 			// Return the leanest payload possible: id, name, and package_id (nested in build_info).
-			$results = $wpdb->get_results( "SELECT id, app_name, build_information FROM $table ORDER BY id DESC", ARRAY_A );
+			$results = $wpdb->get_results( "SELECT id, app_name, build_config FROM $table ORDER BY id DESC", ARRAY_A );
 
 			$apps = [];
 			foreach ( (array) $results as $row ) {
@@ -157,7 +157,7 @@ class Apps_Controller extends Base_Controller {
 					'app_name' => $row['app_name'],
 				];
 				
-				$build_info = !empty( $row['build_information'] ) ? json_decode( $row['build_information'], true ) : [];
+				$build_info = !empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 				if ( is_array( $build_info ) && !empty( $build_info['package_id'] ) ) {
 					$hydrated['package_id'] = $build_info['package_id'];
 				}
@@ -487,8 +487,9 @@ class Apps_Controller extends Base_Controller {
 					$sanitized_category[$key] = $this->sanitize_field( $raw_value, $field_config, $key );
 				}
 
-				if ( $category === 'live_config' ) {
-					// Bump time hash for live config
+				if ( $category === 'build_config' ) {
+					// Bump time hash so the host preview app (my.appress.app)
+					// can short-circuit on cold-start when nothing changed.
 					$sanitized_category['update_time_hash'] = (string) time();
 				}
 
@@ -531,16 +532,26 @@ class Apps_Controller extends Base_Controller {
 
 			// Push backup to Central SaaS (fire-and-forget, non-blocking).
 			// Token in DB is encrypted at-rest → decrypt before sending plaintext over HTTPS.
-			$backup_config  = json_decode( $update_payload['live_config'] ?? '{}', true ) ?: [];
-			$backup_build   = json_decode( $update_payload['build_information'] ?? '{}', true ) ?: [];
+			$backup_build   = json_decode( $update_payload['build_config'] ?? '{}', true ) ?: [];
 			$plain_token    = \Appress\decrypt( (string) $row['connection_token'] );
 			wp_remote_post( APPRESS_CENTRAL_URL . '/?my_appress=1&action=app.update_config', [
 				'headers'   => [ 'Content-Type' => 'application/json' ],
 				'body'      => wp_json_encode( [
-					'connection_token'  => $plain_token,
-					'config'            => $backup_config,
-					'build_information' => $backup_build,
-					'signing_secret'    => $signing_secret,
+					'connection_token'    => $plain_token,
+					// Single source of truth post-1.3.0. Older Central
+					// deployments (<= 1.1.x) read this under the legacy
+					// `build_information` key — duplicated so the rolling
+					// upgrade window is safe.
+					'build_config'        => $backup_build,
+					'build_information'   => $backup_build,
+					// Legacy `config` key carried the old live_config slice
+					// (now merged into build_config). Older Central reads
+					// $params['config'] for its post_meta backup, so pass
+					// the merged build_config through that key too — it
+					// just means Central will mirror the same blob
+					// twice on disk for one upgrade cycle.
+					'config'              => $backup_build,
+					'signing_secret'      => $signing_secret,
 				] ),
 				'timeout'   => 0.01,
 				'blocking'  => false,
@@ -647,7 +658,7 @@ class Apps_Controller extends Base_Controller {
 				global $wpdb;
 				$table = $wpdb->prefix . 'appress_apps';
 				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-				$bi    = $wpdb->get_var( $wpdb->prepare( "SELECT build_information FROM {$table} WHERE id = %d", $app_id ) );
+				$bi    = $wpdb->get_var( $wpdb->prepare( "SELECT build_config FROM {$table} WHERE id = %d", $app_id ) );
 				$json  = json_decode( (string) $bi, true );
 				if ( is_array( $json ) ) {
 					$bundle = (string) ( $json['package_id'] ?? '' );
@@ -706,7 +717,7 @@ class Apps_Controller extends Base_Controller {
 	}
 
 	/**
-	 * Write `apple_store_id` into a single app's `build_information`
+	 * Write `apple_store_id` into a single app's `build_config`
 	 * column without disturbing other keys. Called inline by the
 	 * lookup endpoint when the caller wants the value persisted in
 	 * one round-trip.
@@ -715,7 +726,7 @@ class Apps_Controller extends Base_Controller {
 		global $wpdb;
 		$table = $wpdb->prefix . 'appress_apps';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$raw = $wpdb->get_var( $wpdb->prepare( "SELECT build_information FROM {$table} WHERE id = %d", $app_id ) );
+		$raw = $wpdb->get_var( $wpdb->prepare( "SELECT build_config FROM {$table} WHERE id = %d", $app_id ) );
 		if ( $raw === null ) {
 			return false;
 		}
@@ -728,7 +739,7 @@ class Apps_Controller extends Base_Controller {
 		}
 		$bi['apple_store_id'] = $store_id;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->update( $table, [ 'build_information' => wp_json_encode( $bi ) ], [ 'id' => $app_id ] );
+		$wpdb->update( $table, [ 'build_config' => wp_json_encode( $bi ) ], [ 'id' => $app_id ] );
 		return true;
 	}
 
@@ -779,25 +790,24 @@ class Apps_Controller extends Base_Controller {
 				$central_app_id = intval( $body['data']['post_id'] ?? 0 );
 				$app_name = !empty($body['data']['post_title']) ? sanitize_text_field($body['data']['post_title']) : 'SaaS App';
 
-				// Sanitize live_config backup from Central through schema.
-				$live_config_raw = $body['data']['live_config_backup'] ?? [];
-				$live_config_from_backup = [];
-				if ( is_array( $live_config_raw ) && ! empty( $live_config_raw ) ) {
-					$schema = \Appress\config('schema');
-					$live_fields = $schema['live_config']['fields'] ?? [];
-					foreach ( $live_fields as $key => $field_config ) {
-						if ( array_key_exists( $key, $live_config_raw ) ) {
-							try {
-								$live_config_from_backup[$key] = $this->sanitize_field( $live_config_raw[$key], $field_config, $key );
-							} catch ( \Exception $e ) {
-								$live_config_from_backup[$key] = $field_config['default'] ?? null;
-							}
-						}
-					}
-				}
-
-				$build_info_backup = $body['data']['build_information_backup'] ?? [];
+				// Pre-1.3.0 Central used to split the backup across two
+				// post_meta blobs (`config` ↔ live_config_backup,
+				// `build_information` ↔ build_information_backup). v1.3.0
+				// collapsed those into a single `build_config` blob, so
+				// every legacy key now feeds into the same merge target.
+				// Order matters: newest schema's `build_config_backup`
+				// wins, falling back to the legacy keys for older
+				// Central deployments.
+				$build_info_backup = $body['data']['build_config_backup']
+					?? $body['data']['build_information_backup']
+					?? [];
 				$build_info_from_backup = is_array( $build_info_backup ) ? $build_info_backup : [];
+
+				$legacy_live_backup = $body['data']['live_config_backup'] ?? [];
+				if ( is_array( $legacy_live_backup ) && ! empty( $legacy_live_backup ) ) {
+					// Build wins on collision — newer slot.
+					$build_info_from_backup = array_replace( $legacy_live_backup, $build_info_from_backup );
+				}
 
 				// Always-fresh fields from Central regardless of merge path —
 				// these are authoritative on Central (package_id is allocated
@@ -826,26 +836,23 @@ class Apps_Controller extends Base_Controller {
 				// row we find here was previously linked with a DIFFERENT
 				// token (rotation: Central revoked → new token issued) or
 				// the user is reconnecting an app whose connection_token
-				// was cleared locally. Either way, preserve their local
-				// build_information / live_config edits — only overwrite
-				// when a field is genuinely missing or empty locally and
-				// the backup has a value. Never blow away user-edited
-				// fields with stale Central backups.
+				// was cleared locally. Either way, preserve local
+				// build_config edits — only overwrite when a field is
+				// genuinely missing or empty locally and the backup has
+				// a value. Never blow away user-edited fields with stale
+				// Central backups.
 				$existing_row = $central_app_id > 0
-					? $wpdb->get_row( $wpdb->prepare( "SELECT id, build_information, live_config FROM $table WHERE central_app_id = %d", $central_app_id ), ARRAY_A )
+					? $wpdb->get_row( $wpdb->prepare( "SELECT id, build_config FROM $table WHERE central_app_id = %d", $central_app_id ), ARRAY_A )
 					: null;
 
 				if ( $existing_row ) {
-					$local_build = json_decode( (string) $existing_row['build_information'], true );
+					$local_build = json_decode( (string) $existing_row['build_config'], true );
 					$local_build = is_array( $local_build ) ? $local_build : [];
-					$local_live  = json_decode( (string) $existing_row['live_config'], true );
-					$local_live  = is_array( $local_live ) ? $local_live : [];
 
 					// Fill-only-missing: local wins where it has a non-empty
 					// value; backup fills holes. `array_replace` order matters
 					// — backup first, local overlays it.
 					$merged_build = array_replace( $build_info_from_backup, $this->non_empty( $local_build ) );
-					$merged_live  = array_replace( $live_config_from_backup, $this->non_empty( $local_live ) );
 
 					// Always-fresh essentials override either side.
 					$merged_build = array_replace( $merged_build, $essentials );
@@ -854,8 +861,7 @@ class Apps_Controller extends Base_Controller {
 						'app_name'                => $app_name,
 						'connection_token'        => \Appress\encrypt( $token ),
 						'connection_token_lookup' => \Appress\lookup_hash( $token ),
-						'build_information'       => wp_json_encode( $merged_build ),
-						'live_config'             => wp_json_encode( $merged_live ),
+						'build_config'            => wp_json_encode( $merged_build ),
 					];
 					if ( $signing_secret !== '' ) {
 						$update_payload['signing_secret'] = \Appress\encrypt( $signing_secret );
@@ -885,8 +891,7 @@ class Apps_Controller extends Base_Controller {
 					'connection_token_lookup'  => \Appress\lookup_hash( $token ),
 					'central_app_id'           => $central_app_id,
 					'unique_class'             => $unique_class !== '' ? $unique_class : null,
-					'build_information'        => wp_json_encode( $build_info ),
-					'live_config'              => wp_json_encode( $live_config_from_backup ),
+					'build_config'             => wp_json_encode( $build_info ),
 					'signing_secret'           => $signing_secret !== '' ? \Appress\encrypt( $signing_secret ) : null,
 				]);
 
@@ -932,10 +937,8 @@ class Apps_Controller extends Base_Controller {
 				throw new \Exception( esc_html__( 'App not found in local database.', 'appress' ) );
 			}
 
-			$build_info = ! empty( $row['build_information'] ) ? json_decode( $row['build_information'], true ) : [];
-			$live_cfg   = ! empty( $row['live_config'] )       ? json_decode( $row['live_config'], true )       : [];
+			$build_info = ! empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 			if ( ! is_array( $build_info ) ) $build_info = [];
-			if ( ! is_array( $live_cfg ) )   $live_cfg   = [];
 
 			// Signing credentials live in the encrypted `credentials` JSON
 			// column. Decrypt here for transit to Central over HTTPS — Central
@@ -995,7 +998,7 @@ class Apps_Controller extends Base_Controller {
 				'url'              => $build_info['url']              ?? '',
 				'platforms'        => $platforms,
 
-				// iOS signing — Team ID (public, from build_information) +
+				// iOS signing — Team ID (public, from build_config) +
 				// App Store Connect API Key trio (encrypted at rest). Build
 				// Engine uses the API key with xcodebuild -allowProvisioning-
 				// Updates to fetch/create Development profile on the fly and
@@ -1342,8 +1345,8 @@ class Apps_Controller extends Base_Controller {
 	 *   - app_name       (post title — customer renames in Central UI)
 	 *   - sha1_fingerprint (derived from the build keystore)
 	 *
-	 * Used by the "refresh" icon next to Package ID in Build Information.
-	 * Does NOT touch user-edited fields in `build_information` or
+	 * Used by the "refresh" icon next to Package ID in Build Config.
+	 * Does NOT touch user-edited fields in `build_config` or
 	 * `live_config` — only the three essentials above are merged in.
 	 *
 	 * Mirrors the merge step in handle_onboard()'s reconnect branch
@@ -1362,7 +1365,7 @@ class Apps_Controller extends Base_Controller {
 			global $wpdb;
 			$table = $wpdb->prefix . 'appress_apps';
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
-			$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, connection_token, build_information FROM {$table} WHERE id = %d", $app_id ), ARRAY_A );
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT id, connection_token, build_config FROM {$table} WHERE id = %d", $app_id ), ARRAY_A );
 			if ( ! $row ) {
 				throw new \Exception( esc_html__( 'App not found.', 'appress' ) );
 			}
@@ -1409,7 +1412,7 @@ class Apps_Controller extends Base_Controller {
 			$unique_class_raw = sanitize_text_field( $data['unique_class'] ?? '' );
 			$unique_class = preg_match( '/^X[a-f0-9]{8,32}$/', $unique_class_raw ) === 1 ? $unique_class_raw : '';
 
-			$build = json_decode( (string) $row['build_information'], true );
+			$build = json_decode( (string) $row['build_config'], true );
 			$build = is_array( $build ) ? $build : [];
 
 			$essentials = [];
@@ -1429,7 +1432,7 @@ class Apps_Controller extends Base_Controller {
 
 			$merged_build = array_replace( $build, $essentials );
 
-			$update_payload = [ 'build_information' => wp_json_encode( $merged_build ) ];
+			$update_payload = [ 'build_config' => wp_json_encode( $merged_build ) ];
 			if ( $app_name !== '' ) {
 				$update_payload['app_name'] = $app_name;
 			}

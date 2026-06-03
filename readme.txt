@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.20
+Stable tag: 1.0.0.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,12 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.21 =
+* Settings page restructured — the "Build Information" tab is now called "Build Config", and the separate "Live App Builder" tab has been retired. Everything you used to configure across both is now in one place. Your existing settings carry over automatically; no re-entry needed.
+* New "Open in subscreen" toggle in Native Features. When you turn it off, link taps inside the app load the page in-place on the current tab instead of pushing a modal subscreen on top — and the related settings (URL patterns, "Show bottom nav on subscreen") auto-hide so the form stays clean.
+* When subscreen is disabled, the "Page routing overrides" section is hidden entirely — those overrides only made sense when subscreen was on, so they no longer clutter the form.
+* Removed the in-app purchase (IAP) integration end-to-end. New builds no longer ship the IAP SDK and the related App Store / Play Store data-safety disclosure is no longer required.
 
 = 1.0.0.20 =
 * New onboarding tour pops up the first time you open the settings page for a new app — a 4-slide walkthrough of the app's building blocks (Build Information, App Screens, Bottom Navigation, Side Menus) with an inline phone mockup that animates each component as you step through.

@@ -122,12 +122,12 @@ class Admin_Controller extends \Appress\Controllers\Base_Controller {
 			$this->check_permissions();
 			global $wpdb;
 			$table = $wpdb->prefix . 'appress_apps';
-			$apps = $wpdb->get_results( "SELECT id, app_name, build_information FROM {$table} ORDER BY created_at DESC", ARRAY_A );
+			$apps = $wpdb->get_results( "SELECT id, app_name, build_config FROM {$table} ORDER BY created_at DESC", ARRAY_A );
 			
 			$formatted_apps = [];
 			if ($apps) {
 				foreach ($apps as $app) {
-					$build_info = json_decode($app['build_information'] ?? '{}', true) ?: [];
+					$build_info = json_decode($app['build_config'] ?? '{}', true) ?: [];
 					$formatted_apps[] = [
 						'id' => $app['id'],
 						'app_name' => $app['app_name'],

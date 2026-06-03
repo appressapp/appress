@@ -141,10 +141,10 @@ class Admin_Controller extends \Appress\Controllers\Base_Controller {
 		// used by WP core itself for this construction.
 		$table = $wpdb->prefix . 'appress_apps';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,PluginCheck.Security.DirectDB.UnescapedDBParameter
-		$rows = $wpdb->get_results( "SELECT id, app_name, build_information FROM {$table} ORDER BY id ASC", ARRAY_A );
+		$rows = $wpdb->get_results( "SELECT id, app_name, build_config FROM {$table} ORDER BY id ASC", ARRAY_A );
 		$out = [];
 		foreach ( (array) $rows as $row ) {
-			$bi = json_decode( $row['build_information'] ?? '{}', true ) ?: [];
+			$bi = json_decode( $row['build_config'] ?? '{}', true ) ?: [];
 			$out[] = [
 				'id'             => (int) $row['id'],
 				'app_name'       => (string) $row['app_name'],

@@ -105,10 +105,10 @@ class Shortcode_Controller extends \Appress\Controllers\Base_Controller {
 		if ( ! empty( $atts['app_id'] ) ) {
 			global $wpdb;
 			$table = $wpdb->prefix . 'appress_apps';
-			$row = $wpdb->get_row( $wpdb->prepare( "SELECT build_information FROM {$table} WHERE id = %d", intval( $atts['app_id'] ) ), ARRAY_A );
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT build_config FROM {$table} WHERE id = %d", intval( $atts['app_id'] ) ), ARRAY_A );
 			
 			if ( $row ) {
-				$build_info = json_decode( $row['build_information'] ?? '{}', true ) ?: [];
+				$build_info = json_decode( $row['build_config'] ?? '{}', true ) ?: [];
 				$package_id = $build_info['package-id'] ?? '';
 				
 				if ( ! empty( $package_id ) ) {

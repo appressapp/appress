@@ -66,14 +66,14 @@ class Google_Controller extends \Appress\Controllers\Base_Controller {
 
 			global $wpdb;
 			$table = $wpdb->prefix . 'appress_apps';
-			$row = $wpdb->get_row( $wpdb->prepare( "SELECT build_information FROM $table WHERE id = %d LIMIT 1", $app_id ) );
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT build_config FROM $table WHERE id = %d LIMIT 1", $app_id ) );
 
 			if ( ! $row ) {
 				/* translators: %s: app id sent in the request */
 				throw new \Exception( esc_html( sprintf( __( 'App not found. ID sent: %s', 'appress' ), $app_id ) ) );
 			}
  
-			$build_info = json_decode( $row->build_information ?? '{}', true ) ?: [];
+			$build_info = json_decode( $row->build_config ?? '{}', true ) ?: [];
 			$allowed_client_ids = [];
 
 			// Extract OAuth client IDs from the Android google-services.json.
