@@ -199,7 +199,7 @@ class Cron_Controller extends \Appress\Controllers\Base_Controller {
 		$persist_payload_base = [
 			'url'                 => $url,
 			'image'               => $image,
-			'appress_campaign_id' => (string) $campaign_id,
+			'campaign_id' => (string) $campaign_id,
 		];
 
 		$sent = 0;
@@ -208,7 +208,7 @@ class Cron_Controller extends \Appress\Controllers\Base_Controller {
 
 		// Same unified service WC / Voxel events use — broadcast stops being a
 		// parallel code path: persist (for logged-in users), FCM multicast,
-		// `appress_source_id` threading, and `appress/notification/dispatched`
+		// `source_id` threading, and `appress/notification/dispatched`
 		// all happen inside the service so campaign stats + feed items + mark-
 		// read routing stay identical regardless of source.
 		foreach ( $rows as $row ) {

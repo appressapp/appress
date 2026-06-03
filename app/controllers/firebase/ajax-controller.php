@@ -101,8 +101,8 @@ class Ajax_Controller extends \Appress\Controllers\Base_Controller {
 				throw new \Exception( esc_html__( 'App is missing its signing secret.', 'appress' ) );
 			}
 
-			$sig = isset( $_SERVER['HTTP_X_APPRESS_SIG'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_APPRESS_SIG'] ) ) : '';
-			$ts  = isset( $_SERVER['HTTP_X_APPRESS_TS'] ) ? (int) ( $_SERVER['HTTP_X_APPRESS_TS'] ?? 0 ) : 0;
+			$sig = isset( $_SERVER['HTTP_X_APP_SIG'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_APP_SIG'] ) ) : '';
+			$ts  = isset( $_SERVER['HTTP_X_APP_TS'] ) ? (int) ( $_SERVER['HTTP_X_APP_TS'] ?? 0 ) : 0;
 
 			if ( $sig === '' || $ts <= 0 ) {
 				throw new \Exception( esc_html__( 'Signed request required.', 'appress' ) );

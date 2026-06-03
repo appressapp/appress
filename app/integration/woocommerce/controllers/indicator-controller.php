@@ -215,7 +215,7 @@ JS;
 	}
 
 	document.addEventListener('visibilitychange', function() { if (!document.hidden) checkAndReload(); });
-	window.addEventListener('appress:screen_activated', checkAndReload);
+	window.addEventListener('app:screen_activated', checkAndReload);
 })();
 JS;
 

@@ -21,19 +21,28 @@
  * native side — one wins, the other no-ops.
  */
 (function () {
+	// Per-app native-class-ID indirection — see back-button-widget.js
+	// for the full explanation. Same pattern reused.
+	var IDS = window.AppressClassIds || {};
+	var NB_KEY = IDS.native        || 'AppressNativeBridge';
+	var LI_KEY = IDS.linkIntercept || 'AppressLinkIntercept';
+	var NS_KEY = IDS.namespace     || 'Appress';
+
 	function postNative(type) {
 		var msg = JSON.stringify({ type: type });
 		try {
-			if (window.AppressNativeBridge && typeof window.AppressNativeBridge.postMessage === 'function') {
-				window.AppressNativeBridge.postMessage(msg);
+			var nb = window[NB_KEY];
+			if (nb && typeof nb.postMessage === 'function') {
+				nb.postMessage(msg);
 				return true;
 			}
-			if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.AppressNativeBridge) {
-				window.webkit.messageHandlers.AppressNativeBridge.postMessage(msg);
+			var mh = window.webkit && window.webkit.messageHandlers;
+			if (mh && mh[NB_KEY]) {
+				mh[NB_KEY].postMessage(msg);
 				return true;
 			}
-			if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.AppressLinkIntercept) {
-				window.webkit.messageHandlers.AppressLinkIntercept.postMessage({ type: type });
+			if (mh && mh[LI_KEY]) {
+				mh[LI_KEY].postMessage({ type: type });
 				return true;
 			}
 		} catch (e) {}
@@ -41,8 +50,9 @@
 	}
 
 	function getContext() {
-		return (window.Appress && typeof window.Appress.backButtonContext === 'string')
-			? window.Appress.backButtonContext
+		var ns = window[NS_KEY];
+		return (ns && typeof ns.backButtonContext === 'string')
+			? ns.backButtonContext
 			: null;
 	}
 

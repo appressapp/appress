@@ -24,49 +24,40 @@
 (function () {
   'use strict';
 
+  // Per-app native-class-ID indirection (see back-button-widget.js).
+  var IDS = window.AppressClassIds || {};
+  var NB_KEY = IDS.native || 'AppressNativeBridge';
+  var MB_KEY = IDS.master || 'AppressMasterBridge';
+
   function isInApp() {
-    // Android slave (tab / subscreen): AppressNativeBridge.postMessage.
-    if (window.AppressNativeBridge && typeof window.AppressNativeBridge.postMessage === 'function') {
-      return true;
-    }
-    // Android master (Capacitor WebView): AppressMasterBridge.postMessage —
-    // distinct JSInterface from slave (master also exposes typed methods
-    // like authReport, biometricEnable; postMessage is the generic
-    // integration-dispatch entry point).
-    if (window.AppressMasterBridge && typeof window.AppressMasterBridge.postMessage === 'function') {
-      return true;
-    }
-    // iOS: master (Capacitor WebView) or slave (tab / subscreen) bridge.
+    var nb = window[NB_KEY];
+    if (nb && typeof nb.postMessage === 'function') return true;
+    var mb = window[MB_KEY];
+    if (mb && typeof mb.postMessage === 'function') return true;
     var mh = window.webkit && window.webkit.messageHandlers;
-    return !!(mh && (mh.AppressMasterBridge || mh.AppressNativeBridge));
+    return !!(mh && (mh[MB_KEY] || mh[NB_KEY]));
   }
 
   function postToBridge(payload) {
-    // All handlers (iOS master, iOS slave, Android master, Android slave)
-    // parse the body as a JSON string — always stringify regardless of
-    // platform.
     var serialized = JSON.stringify(payload);
     try {
       var mh = window.webkit && window.webkit.messageHandlers;
-      var iosHandler = mh && (mh.AppressMasterBridge || mh.AppressNativeBridge);
+      var iosHandler = mh && (mh[MB_KEY] || mh[NB_KEY]);
       if (iosHandler) {
         iosHandler.postMessage(serialized);
         return true;
       }
-      // Android slave first — most pages render inside a slave tab.
-      if (window.AppressNativeBridge && typeof window.AppressNativeBridge.postMessage === 'function') {
-        window.AppressNativeBridge.postMessage(serialized);
+      var nb = window[NB_KEY];
+      if (nb && typeof nb.postMessage === 'function') {
+        nb.postMessage(serialized);
         return true;
       }
-      // Android master fallback — switcher rendered on auth gate /
-      // first launch page (Capacitor master WebView, no slave bridge).
-      if (window.AppressMasterBridge && typeof window.AppressMasterBridge.postMessage === 'function') {
-        window.AppressMasterBridge.postMessage(serialized);
+      var mb = window[MB_KEY];
+      if (mb && typeof mb.postMessage === 'function') {
+        mb.postMessage(serialized);
         return true;
       }
     } catch (e) {
-      // Bridge failure shouldn't strand the user. Log and let the
-      // default link navigation take over.
       console.error('[appress-trp-switcher] bridge failed', e);
     }
     return false;

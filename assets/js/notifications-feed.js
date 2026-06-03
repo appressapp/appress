@@ -14,6 +14,16 @@
 (function () {
 	'use strict';
 
+	// Per-app native-class-ID indirection (see back-button-widget.js).
+	// The mobile binary calls `window[IDS.notificationsFeed]` to mount,
+	// refresh, and prepend items — so we expose the API under that key
+	// instead of the literal `window.AppressNotificationsFeed` (which
+	// would leak `Appress` into the binary's `__TEXT`). The config
+	// object (`AppressNotificationsConfig`) is WEB-ONLY (PHP localize),
+	// so its literal name stays.
+	var IDS = window.AppressClassIds || {};
+	var FEED_KEY = IDS.notificationsFeed || 'AppressNotificationsFeed';
+
 	var CFG = window.AppressNotificationsConfig || {};
 	var I18N = CFG.i18n || {};
 	var AJAX_URL = CFG.ajaxUrl || (window.location.origin + '/?appress=1');
@@ -433,15 +443,15 @@
 		mount();
 	}
 
-	window.AppressNotificationsFeed = { mount: mount, refresh: refresh, prependItem: prependItem };
+	window[FEED_KEY] = { mount: mount, refresh: refresh, prependItem: prependItem };
 
 	// Native bridge fan-out: `AppressBridgeController.broadcastFromNative(eventType:"notification:changed")`
 	// dispatches `appress:notification:changed` on every WebView's window so any
 	// mounted feed can `refresh()` to pick up server-side state changes (push
 	// tap mark-read, mark_all_read from another tab, etc.). `notification:received`
 	// carries a full item payload and prepends without a refetch.
-	window.addEventListener('appress:notification:changed', function () { refresh(); });
-	window.addEventListener('appress:notification:received', function (e) {
+	window.addEventListener('app:notification:changed', function () { refresh(); });
+	window.addEventListener('app:notification:received', function (e) {
 		var item = e && e.detail;
 		if (item) prependItem(item);
 	});

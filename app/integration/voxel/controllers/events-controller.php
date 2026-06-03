@@ -179,7 +179,7 @@ class Events_Controller extends Base_Controller {
 
 		// `voxel-<id>` is the feed's ID prefix for Voxel rows (see
 		// Notifications_Controller::ID_PREFIX). Threading it through as the
-		// FCM `appress_source_id` lets the native tap handler hit
+		// FCM `source_id` lets the native tap handler hit
 		// `notifications.mark_read` with the exact Voxel row id — the
 		// filter chain routes it back to Voxel::handle_mark_read which
 		// marks `seen = 1` + bumps the user meta bell count. No URL

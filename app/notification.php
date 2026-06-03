@@ -39,7 +39,7 @@ class Notification {
 	 *               length-1 behaves like the scalar form.
 	 *
 	 * @param int|int[] $user_id
-	 * @param array     $payload  Ride-along data sent to the client: url, image, appress_campaign_id, extras.
+	 * @param array     $payload  Ride-along data sent to the client: url, image, campaign_id, extras.
 	 * @param array     $opts     Server-side behaviour flags:
 	 *                              - skip_persist (bool)       — skip DB row when caller has its own store.
 	 *                              - override_tokens (string[]) — pre-resolved FCM tokens (broadcast + guest).
@@ -97,14 +97,14 @@ class Notification {
 					'image' => (string) ( $payload['image'] ?? '' ),
 					'url'   => (string) ( $payload['url'] ?? '' ),
 				];
-				if ( ! empty( $payload['appress_campaign_id'] ) ) {
-					$data_payload['appress_campaign_id'] = (string) $payload['appress_campaign_id'];
+				if ( ! empty( $payload['campaign_id'] ) ) {
+					$data_payload['campaign_id'] = (string) $payload['campaign_id'];
 				}
 				// Explicit override_source_id wins over the just-persisted row id.
 				if ( ! empty( $opts['override_source_id'] ) ) {
-					$data_payload['appress_source_id'] = (string) $opts['override_source_id'];
+					$data_payload['source_id'] = (string) $opts['override_source_id'];
 				} elseif ( $one['notification_id'] ) {
-					$data_payload['appress_source_id'] = (string) $one['notification_id'];
+					$data_payload['source_id'] = (string) $one['notification_id'];
 				}
 				if ( ! empty( $opts['extra_data'] ) && is_array( $opts['extra_data'] ) ) {
 					foreach ( $opts['extra_data'] as $k => $v ) {
@@ -168,8 +168,8 @@ class Notification {
 		// Hoist campaign_id into its own column so `notifications.mark_read`
 		// can target an entire campaign on FCM tap without unpacking JSON.
 		$campaign_id = 0;
-		if ( is_array( $payload ) && isset( $payload['appress_campaign_id'] ) ) {
-			$campaign_id = (int) $payload['appress_campaign_id'];
+		if ( is_array( $payload ) && isset( $payload['campaign_id'] ) ) {
+			$campaign_id = (int) $payload['campaign_id'];
 		}
 
 		$data = [

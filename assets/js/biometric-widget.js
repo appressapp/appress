@@ -3,7 +3,7 @@
  *
  * Wires every `[data-appress-biometric]` root rendered on the page:
  *   - Logged-OUT state: "Sign in with Face ID / Touch ID" button that
- *     calls `window.Appress.biometric.signIn()`; reloads on success.
+ *     calls `(appressNs() || {}).biometric.signIn()`; reloads on success.
  *     Only reveals itself when the device has a paired token.
  *   - Logged-IN state: live pairing status + Enable/Disable toggle +
  *     "Clear all devices" button (server-side revoke + local purge).
@@ -20,16 +20,31 @@
 	// via `appress/assets/localize/{handle}` filter in
 	// Biometric\Shortcode_Controller::localize_strings(). Defensive defaults
 	// so the widget never blows up if the global is missing.
+	// Per-app native-class-ID indirection (see back-button-widget.js).
+	// `AppressBiometric` (the config object below) is WEB-ONLY — set
+	// by PHP `wp_localize_script`, read here. The mobile binary never
+	// references it, so the literal name stays.
+	var IDS = window.AppressClassIds || {};
+	var NB_KEY = IDS.native        || 'AppressNativeBridge';
+	var LI_KEY = IDS.linkIntercept || 'AppressLinkIntercept';
+	var NS_KEY = IDS.namespace     || 'Appress';
+
 	var CFG  = (window.AppressBiometric && typeof window.AppressBiometric === 'object') ? window.AppressBiometric : {};
 	var I18N = (CFG.i18n && typeof CFG.i18n === 'object') ? CFG.i18n : {};
 	function t(key, fallback) { return typeof I18N[key] === 'string' ? I18N[key] : fallback; }
 
+	function appressNs() { return window[NS_KEY]; }
+
 	function postPill(type) {
 		try {
-			if (window.AppressNativeBridge && typeof window.AppressNativeBridge.postMessage === 'function') {
-				window.AppressNativeBridge.postMessage(JSON.stringify({ type: type }));
-			} else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.AppressLinkIntercept) {
-				window.webkit.messageHandlers.AppressLinkIntercept.postMessage({ type: type });
+			var nb = window[NB_KEY];
+			if (nb && typeof nb.postMessage === 'function') {
+				nb.postMessage(JSON.stringify({ type: type }));
+				return;
+			}
+			var mh = window.webkit && window.webkit.messageHandlers;
+			if (mh && mh[LI_KEY]) {
+				mh[LI_KEY].postMessage({ type: type });
 			}
 		} catch (e) {}
 	}
@@ -50,7 +65,7 @@
 
 		// No native bridge = desktop browser. Entire widget stays
 		// hidden — nothing to offer without biometric hardware.
-		if (!window.Appress || !window.Appress.biometric) return;
+		var __app = appressNs(); if (!__app || !__app.biometric) return;
 
 		if (loggedIn) { wirePanel(root, appId); }
 		else          { wireLogin(root); }
@@ -62,7 +77,7 @@
 
 		// Only reveal when the device has a paired token AND biometric
 		// is usable right now.
-		window.Appress.biometric.status().then(function (s) {
+		(appressNs() || {}).biometric.status().then(function (s) {
 			if (!s || s.availability !== 'available' || !s.paired) return;
 			root.style.display = '';
 		}, function () {});
@@ -70,7 +85,7 @@
 		btn.addEventListener('click', function () {
 			btn.disabled = true;
 			postPill('show_pill_spinner');
-			window.Appress.biometric.signIn().then(function (r) {
+			(appressNs() || {}).biometric.signIn().then(function (r) {
 				if (r && r.success) {
 					// Cookies landed — reload so WP sees the user.
 					location.reload();
@@ -92,7 +107,7 @@
 		var errEl    = root.querySelector('[data-error]');
 
 		function refresh() {
-			window.Appress.biometric.status().then(function (s) {
+			(appressNs() || {}).biometric.status().then(function (s) {
 				if (!s || s.availability === 'unavailable') {
 					root.style.display = 'none';
 					return;
@@ -124,7 +139,7 @@
 			errEl.style.display = 'none';
 			postPill('show_pill_spinner');
 			var mode = toggle.getAttribute('data-mode');
-			var call = mode === 'disable' ? window.Appress.biometric.disable() : window.Appress.biometric.enable();
+			var call = mode === 'disable' ? (appressNs() || {}).biometric.disable() : (appressNs() || {}).biometric.enable();
 			call.then(function (r) {
 				postPill('hide_pill_spinner');
 				if (r && !r.success && r.reason && r.reason !== 'cancelled') {
@@ -162,8 +177,8 @@
 				// local Keychain so status flips to "not paired"
 				// instantly — otherwise the user sees a stale UI until
 				// the next signIn attempt self-heals.
-				if (typeof window.Appress.biometric.forgetLocal === 'function') {
-					window.Appress.biometric.forgetLocal().then(refresh, refresh);
+				if (typeof (appressNs() || {}).biometric.forgetLocal === 'function') {
+					(appressNs() || {}).biometric.forgetLocal().then(refresh, refresh);
 				} else {
 					refresh();
 				}

@@ -503,7 +503,7 @@ JS;
 	// (`broadcast.track_read`) or any other path mutates server-side state, the
 	// native side fires `appress:notification:changed`. Re-poll the unread count
 	// immediately instead of waiting for the 60s tick so the bell badge syncs live.
-	window.addEventListener('appress:notification:changed', function() {
+	window.addEventListener('app:notification:changed', function() {
 		window.Appress.indicator.refresh('notification');
 	});
 })();

@@ -26,19 +26,33 @@
  * Auto-hide re-eval points: init, `popstate`, `pageshow` (bfcache).
  */
 (function () {
+	// Per-app native-class-ID indirection. Build engine salt-scrambles
+	// every `\bAppress[A-Z]\w*` symbol in the mobile binary to keep the
+	// `__TEXT` segment free of cluster signal, so the JS-side bridge
+	// handler names + the `window.Appress` namespace come back at
+	// runtime via `window.AppressClassIds` (emitted by
+	// `Injection_Controller::emit_native_class_ids`). Fallback to the
+	// literal names keeps legacy pre-Phase-4 builds working.
+	var IDS = window.AppressClassIds || {};
+	var NB_KEY = IDS.native            || 'AppressNativeBridge';
+	var LI_KEY = IDS.linkIntercept     || 'AppressLinkIntercept';
+	var NS_KEY = IDS.namespace         || 'Appress';
+
 	function postNative(type) {
 		var msg = JSON.stringify({ type: type });
 		try {
-			if (window.AppressNativeBridge && typeof window.AppressNativeBridge.postMessage === 'function') {
-				window.AppressNativeBridge.postMessage(msg);
+			var nb = window[NB_KEY];
+			if (nb && typeof nb.postMessage === 'function') {
+				nb.postMessage(msg);
 				return true;
 			}
-			if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.AppressNativeBridge) {
-				window.webkit.messageHandlers.AppressNativeBridge.postMessage(msg);
+			var mh = window.webkit && window.webkit.messageHandlers;
+			if (mh && mh[NB_KEY]) {
+				mh[NB_KEY].postMessage(msg);
 				return true;
 			}
-			if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.AppressLinkIntercept) {
-				window.webkit.messageHandlers.AppressLinkIntercept.postMessage({ type: type });
+			if (mh && mh[LI_KEY]) {
+				mh[LI_KEY].postMessage({ type: type });
 				return true;
 			}
 		} catch (e) {}
@@ -46,8 +60,9 @@
 	}
 
 	function getContext() {
-		return (window.Appress && typeof window.Appress.backButtonContext === 'string')
-			? window.Appress.backButtonContext
+		var ns = window[NS_KEY];
+		return (ns && typeof ns.backButtonContext === 'string')
+			? ns.backButtonContext
 			: null;
 	}
 

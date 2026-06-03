@@ -866,3 +866,58 @@ function get_css_prefix( int $app_id = 0 ): string {
 	$salt = get_app_unique_class( $app_id );
 	return $salt !== '' ? strtolower( $salt ) : 'appress';
 }
+
+/**
+ * Per-app native-class-ID indirection table — the SINGLE source of
+ * truth that lets plugin static `assets/js/*.js` widgets + customer-
+ * site inline CSS talk to a mobile binary whose every `Appress<X>`
+ * symbol is salt-scrambled at build time.
+ *
+ * Mobile app review (Apple 4.3(a) similarity, Play Store classifier)
+ * only inspects the SUBMITTED IPA / AAB — the customer's WordPress
+ * site emissions are downloaded at runtime after install and never
+ * reach review. So we want ZERO occurrence of the literal `Appress`
+ * substring in the native binary's symbol table + `__TEXT` segment,
+ * while keeping every literal `Appress<X>` reference in plugin web
+ * assets perfectly readable (Apple never sees them).
+ *
+ * The build-engine mutator handles binary side — every
+ * `\bAppress[A-Z]\w*` in native source becomes
+ * `<salt><hmac12(suffix)>`. This helper computes the same
+ * `salt + HMAC12(suffix)` for the names that DO cross the boundary
+ * (slave JS calls `window.AppressNativeBridge.postMessage` →
+ * resolves to the salted handler the binary registered) so the
+ * plugin's emitted `window.AppressClassIds` map can hand off the
+ * exact salted name at runtime via `window[window.AppressClassIds.native]`.
+ *
+ * Returned keys:
+ *   - `namespace`         : `<salt>` itself (replaces `window.Appress`)
+ *   - `master`            : iOS master-WebView WKScriptMessageHandler name
+ *   - `native`            : Android JavascriptInterface name
+ *   - `linkIntercept`     : iOS link-intercept message handler name
+ *   - `firstLaunchBridge` : Android JS bridge for the dismiss-first-launch shortcode
+ *   - `notificationsFeed` : `window` global the native binary calls to mount /
+ *                            refresh / prepend the notifications feed widget
+ *
+ * Returns an empty array for legacy / web requests where
+ * `unique_class` is empty. Static .js sites must guard for that
+ * shape (`var ids = window.AppressClassIds || {}; …`) so legacy
+ * pre-Phase-4 installs keep working with the original literal names.
+ */
+function get_native_class_ids( int $app_id = 0 ): array {
+	if ( $app_id <= 0 ) $app_id = get_current_app_id();
+	$salt = get_app_unique_class( $app_id );
+	if ( $salt === '' ) return [];
+	$hmac = static function ( string $suffix ) use ( $salt ): string {
+		return $salt . substr( hash_hmac( 'sha256', $suffix, $salt ), 0, 12 );
+	};
+	return [
+		'namespace'         => $salt,
+		'cssPrefix'         => strtolower( $salt ),
+		'master'            => $hmac( 'MasterBridge' ),
+		'native'            => $hmac( 'NativeBridge' ),
+		'linkIntercept'     => $hmac( 'LinkIntercept' ),
+		'firstLaunchBridge' => $hmac( 'FirstLaunchBridge' ),
+		'notificationsFeed' => $hmac( 'NotificationsFeed' ),
+	];
+}

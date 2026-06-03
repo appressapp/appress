@@ -45,89 +45,164 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
         // fires but HTTP cache stays as WP sent it).
         $this->on('send_headers', '@relax_cache_control_for_prefetch', 999);
 
-        // Boundary-token rewrite safety net. Buffer the page output
-        // for app requests and replace the literal `window.Appress`
-        // namespace + `--appress-status-bar-height` CSS var + related
-        // class selectors with the per-app salted forms that match
-        // the binary's `applyBoundaryMutation` output (see
-        // `build-engine/.../mutator.js`). Inline scripts and CSS
-        // emitted via `wp_add_inline_*` use the helpers directly when
-        // they can; this filter catches anything still going through
-        // raw heredoc emission inside trait/widget/integration code
-        // paths so the customer site's `window.Appress.biometric` JS
-        // call resolves to the same `window.X<salt>` object the binary
-        // exposes. Gated on `is_app()` + a resolved unique_class so web
-        // requests + legacy apps see the original tokens unchanged.
+        // Per-app native-class-ID indirection table — printed FIRST in
+        // `<head>` so every later script (plugin static widget JS, theme
+        // inline JS) can look up the salted bridge handler names the
+        // mobile binary registered. Build-engine mutator scrambles every
+        // `\bAppress[A-Z]\w*` symbol in native source to
+        // `<salt><hmac12(suffix)>` to keep `Appress` out of the
+        // submitted IPA's `__TEXT` segment (Apple 4.3(a)). Slave JS in
+        // the webview can't know the per-build salt at compile time —
+        // hence this runtime map. Plus a `<style>` alias so customer-
+        // site CSS that reads literal `var(--appress-status-bar-height)`
+        // (Bricks / Elementor compiled .css served by Nginx) resolves
+        // through to the salted custom property the binary injects.
+        // Gated on `is_app()` + a resolved `unique_class`; web requests
+        // and legacy pre-Phase-4 apps fall through unchanged.
+        $this->on( 'wp_head', '@emit_native_class_ids', 1 );
+
+        // Heredoc inline JS in plugin integration controllers (woo
+        // biometric account, smart banner, indicator, etc.) still emits
+        // literal `window.AppressNativeBridge.postMessage(…)` calls
+        // because refactoring every PHP heredoc to use the runtime
+        // indirection lookup would touch ~60 sites with no functional
+        // gain. The output buffer below catches them at render time
+        // and rewrites the literal bridge handler names to the salted
+        // form the mobile binary registers — same HMAC-SHA256(salt,
+        // suffix) truncation as `mutator.js applyClassMutation`. Static
+        // `.js` widget files served by Nginx bypass this buffer; they
+        // use the explicit `window.AppressClassIds` indirection added
+        // in the refactor above.
+        //
+        // PHP-localized config object names that live ENTIRELY on the
+        // web side (`AppressBiometric`, `AppressNotificationsConfig`,
+        // `AppressAccountDeletion`, `AppressBiometricI18n`,
+        // `AppressClassIds` itself) skip the rewrite — they're set by
+        // `wp_localize_script` for static .js consumers, never
+        // referenced by the mobile binary, and rewriting them would
+        // sever the static-JS read.
         $this->on('template_redirect', '@start_boundary_buffer', 0);
     }
 
     /**
-     * Start an output buffer that swaps shared boundary tokens to the
-     * per-app salted forms when the response is going to an app webview.
-     * Buffer flushes at request shutdown.
+     * Output buffer that salts plugin-emitted `Appress<X>` heredoc
+     * inline JS bridge calls to match the mobile binary's salted
+     * handler names. Skips web-only PHP-localized config object names.
      */
     public function start_boundary_buffer() {
-        $app_id = \Appress\get_current_app_id();
-        $salt   = \Appress\get_app_unique_class( $app_id );
-        if ( $salt === '' ) return;  // no salt → leave literals alone (legacy / web)
+        $ids = \Appress\get_native_class_ids();
+        if ( empty( $ids ) ) return;
+        $ns      = (string) $ids['namespace'];
+        $salt_lc = strtolower( $ns );
 
-        // Salt is already in canonical `X<hex>` form (the column stores
-        // exactly the string the mutator concatenates onto class names);
-        // use as-is so emitted tokens stay byte-identical to the binary
-        // literals. lowercase variant covers CSS land.
-        $ns         = $salt;
-        $css_prefix = strtolower( $salt );
-
-        ob_start( function ( $buffer ) use ( $ns, $css_prefix ) {
+        ob_start( function ( $buffer ) use ( $ns, $salt_lc ) {
             if ( ! is_string( $buffer ) || $buffer === '' ) return $buffer;
 
-            // CLASS-MUTATION mirror — `\bAppress<UpperCase>\w*` →
-            // `<salt><hmac12(suffix)>`. Same HMAC-SHA256(salt, suffix)
-            // truncated to 12 hex as the mutator's `applyClassMutation`
-            // + `scrambleSuffix`. Native binary registers bridge
-            // handlers (`AppressNativeBridge`, `AppressMasterBridge`,
-            // `AppressLinkIntercept`, `AppressNotificationsFeed`,
-            // `AppressFirstLaunchBridge`, `AppressBiometricService`)
-            // under salt-scrambled names. MUST run BEFORE the bare
-            // `window.Appress` substitution below.
+            // Names set / read ONLY on the web side — never appear in
+            // the submitted mobile binary, so salting them in HTML
+            // would break the static-JS read. `AppressClassIds` is
+            // the indirection table itself; the rest are
+            // `wp_localize_script` config objects.
+            static $excludes = [
+                'AppressClassIds',
+                'AppressBiometric',
+                'AppressBiometricI18n',
+                'AppressNotificationsConfig',
+                'AppressAccountDeletion',
+            ];
+
             $buffer = preg_replace_callback(
                 '/\bAppress([A-Z]\w*)/',
-                function ( $m ) use ( $ns ) {
+                function ( $m ) use ( $ns, $excludes ) {
+                    if ( in_array( $m[0], $excludes, true ) ) return $m[0];
                     return $ns . substr( hash_hmac( 'sha256', $m[1], $ns ), 0, 12 );
                 },
                 $buffer
             );
-
             // `window.Appress` bare namespace.
             $buffer = preg_replace(
                 '/\bwindow\.Appress(?![A-Za-z0-9_])/',
                 'window.' . $ns,
                 $buffer
             );
-            // CSS custom property `--appress-status-bar-height` (both
-            // declaration and `var()` reference paths) — catches any
-            // inline `<style>` block + inline `style="…"` attribute on
-            // the rendered HTML. CSS rules that reference the var from
-            // a STATIC `.css` file (Elementor compiled per-page CSS,
-            // theme stylesheets) bypass this buffer; for plugin-shipped
-            // static CSS the fix is to emit the rule inline at render
-            // time (see `Status_Bar_Height_Shortcode_Controller`). For
-            // CSS shipped via the boot/build payload, `get_app_css()`
-            // does the matching rewrite before the payload leaves PHP.
-            //
-            // HTML class names like `appress-status-bar-height` /
-            // `appress-sticky` are deliberately NOT mutated — Elementor
-            // compiles widget-level rules (e.g. per-widget background-
-            // color) to selectors like `{{WRAPPER}} .appress-status-bar-height`
-            // in its own per-page `.css` file; salting the rendered class
-            // would break those targeting rules. Class names kept literal.
+            // CSS custom property — the binary's runtime injection
+            // writes the salted custom property name. Customer
+            // stylesheets in static .css files still read literal
+            // `var(--appress-status-bar-height)` and resolve through
+            // the `:root{…}` alias emitted by `emit_native_class_ids`;
+            // PHP-emitted inline CSS goes through this buffer and gets
+            // rewritten so the alias isn't needed for them.
             $buffer = str_replace(
                 '--appress-status-bar-height',
-                '--' . $css_prefix . '-status-bar-height',
+                '--' . $salt_lc . '-status-bar-height',
                 $buffer
             );
             return $buffer;
         } );
+    }
+
+    /**
+     * Emit `<script>window.AppressClassIds = {…}</script>` + the
+     * `--appress-status-bar-height` CSS alias as early in `<head>` as
+     * possible so every downstream script + style block sees the
+     * indirection map populated.
+     */
+    public function emit_native_class_ids() {
+        $ids = \Appress\get_native_class_ids();
+        if ( empty( $ids ) ) return;
+
+        $salt    = (string) $ids['namespace'];
+        $salt_lc = strtolower( $salt );
+
+        // `window.AppressClassIds` lives only in the customer's
+        // rendered HTML + the plugin's static .js widget files — never
+        // in the submitted mobile binary — so the literal name is fine
+        // to keep readable.
+        echo '<script>window.AppressClassIds=' . wp_json_encode( $ids ) . ";</script>\n";
+
+        // Runtime mirror script — wires customer's literal surface
+        // (`window.Appress.*`, `class="appress-open-menu"`,
+        // `data-appress-action="…"`) to the salted form the native
+        // binary uses after mutator. Without this, every native JS
+        // inject that says `<salt>.indicator.refresh()` or
+        // `closest('.<saltLc>-open-menu')` would miss the customer's
+        // legacy-named objects/elements. Runs at wp_head priority 1
+        // (before any plugin/theme inline JS) + a MutationObserver to
+        // catch SPAs / Vue / customer-late-rendered DOM.
+        $ns_js  = wp_json_encode( $salt );
+        $css_js = wp_json_encode( $salt_lc );
+        echo "<script>(function(){var NS={$ns_js},CP={$css_js};if(NS==='Appress')return;"
+            . "window[NS]=window[NS]||window.Appress||{};window.Appress=window[NS];"
+            . "var MAP={'appress-open-menu':CP+'-open-menu','appress-open-right-menu':CP+'-open-right-menu',"
+            . "'appress-qr-scanner-trigger':CP+'-qr-scanner-trigger',"
+            . "'appress-dismiss-first-launch-screen':CP+'-dismiss-first-launch-screen',"
+            . "'appress-sticky':CP+'-sticky','appress-preview-trigger':CP+'-preview-trigger'};"
+            . "function mirror(el){if(!el||!el.classList)return;"
+            . "for(var k in MAP){if(el.classList.contains(k)&&!el.classList.contains(MAP[k]))el.classList.add(MAP[k]);}"
+            . "if(el.hasAttribute&&el.hasAttribute('data-appress-action')){"
+            . "var v=el.getAttribute('data-appress-action');"
+            . "if(!el.hasAttribute('data-'+CP+'-action'))el.setAttribute('data-'+CP+'-action',v);}}"
+            . "function scan(r){if(!r)return;mirror(r);"
+            . "if(r.querySelectorAll){var n=r.querySelectorAll('[class*=\"appress-\"],[data-appress-action]');"
+            . "for(var i=0;i<n.length;i++)mirror(n[i]);}}"
+            . "function boot(){scan(document.body||document.documentElement);"
+            . "if(window.MutationObserver){new MutationObserver(function(ms){"
+            . "for(var i=0;i<ms.length;i++){var a=ms[i].addedNodes;if(!a)continue;"
+            . "for(var j=0;j<a.length;j++)if(a[j].nodeType===1)scan(a[j]);}})"
+            . ".observe(document.documentElement,{childList:true,subtree:true});}}"
+            . "if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);"
+            . "else boot();})();</script>\n";
+
+        // CSS alias: the binary's slave-JS injection writes the salted
+        // `--<salt_lc>-status-bar-height` custom property at
+        // documentStart. Customer stylesheets (Bricks compiled CSS,
+        // Elementor per-page CSS, theme files) read literal
+        // `var(--appress-status-bar-height)` because those .css files
+        // are static and Nginx-served — PHP can't rewrite them. This
+        // alias resolves the literal name through to the salted one,
+        // so every customer surface keeps working without us leaking
+        // the literal name into the binary's `__TEXT`.
+        echo '<style>:root{--appress-status-bar-height:var(--' . esc_html( $salt_lc ) . "-status-bar-height,0px)}</style>\n";
     }
 
     public function enqueue_native_assets()

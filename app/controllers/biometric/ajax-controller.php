@@ -90,8 +90,8 @@ class Ajax_Controller extends \Appress\Controllers\Base_Controller {
 		if ( ! ( $user instanceof \WP_User ) ) {
 			return;
 		}
-		$uuid = isset( $_COOKIE['appress_device_uuid'] )
-			? sanitize_text_field( wp_unslash( $_COOKIE['appress_device_uuid'] ) )
+		$uuid = isset( $_COOKIE['app_device_uuid'] )
+			? sanitize_text_field( wp_unslash( $_COOKIE['app_device_uuid'] ) )
 			: '';
 		if ( $uuid === '' ) {
 			return;

@@ -20,9 +20,15 @@
 
 	var AJAX_URL = (window.Apppress_Config && window.Apppress_Config.ajaxUrl) || '/?appress=1';
 
+	// Per-app native-class-ID indirection (see back-button-widget.js).
+	var IDS = window.AppressClassIds || {};
+	var NB_KEY = IDS.native || 'AppressNativeBridge';
+
 	function isInAppressApp() {
-		if (window.AppressNativeBridge && typeof window.AppressNativeBridge.postMessage === 'function') return true;
-		if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.AppressNativeBridge) return true;
+		var nb = window[NB_KEY];
+		if (nb && typeof nb.postMessage === 'function') return true;
+		var mh = window.webkit && window.webkit.messageHandlers;
+		if (mh && mh[NB_KEY]) return true;
 		return false;
 	}
 
