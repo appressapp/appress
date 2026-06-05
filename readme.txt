@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.28
+Stable tag: 1.0.0.29
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,11 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.29 =
+* Builds are now an exact snapshot of your full app configuration — every screen, menu, color, and feature toggle travels with the build instead of being refetched at build time.
+* New "Config" button on each build in the Builds tab shows the exact configuration that produced the .apk / .ipa, with credentials redacted.
+* Requires Build Engine v1.0.26+.
 
 = 1.0.0.28 =
 * Fixed the in-app status bar height returning 0 when the app's status bar CSS variable was being inadvertently rewritten to a self-reference.

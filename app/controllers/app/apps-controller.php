@@ -38,6 +38,7 @@ class Apps_Controller extends Base_Controller {
 		$this->on( 'appress_ajax_app.refresh_essentials', '@refresh_essentials' );
 		$this->on( 'appress_ajax_app.request_build', '@request_build' );
 		$this->on( 'appress_ajax_app.get_builds', '@get_builds' );
+		$this->on( 'appress_ajax_app.get_build_config', '@get_build_config' );
 		$this->on( 'appress_ajax_app.download_build', '@download_build' );
 		$this->on( 'appress_ajax_app.get_plan', '@get_plan' );
 		$this->on( 'appress_ajax_app.testflight_submit', '@submit_testflight' );
@@ -968,34 +969,33 @@ class Apps_Controller extends Base_Controller {
 			$platforms     = json_decode( $platforms_raw, true );
 			if ( ! is_array( $platforms ) ) $platforms = [ 'android', 'ios' ];
 
-			// Build app_config using the canonical snake_case keys from the schema.
-			// Only ship what the Build Engine actually consumes — `sha1_fingerprint`
-			// (Central already derives it from the auto-generated keystore) is
-			// intentionally omitted.
-			$app_config = [
+			// Ship the FULL admin-configured `build_info` (app_screens,
+			// bottom_navigation, side_menu, right_menu, css_*, first_launch,
+			// auth_gate, subscreen, biometric, etc.) so the build engine
+			// has every UI field baked into `AppressBakedConfig` at compile
+			// time — no runtime `app.boot` refetch needed. The engine
+			// previously had to re-call this site's `app.boot` from
+			// `pre-config.js` to pull the missing UI config, which made
+			// every build engine-side `app-config.json` edit useless
+			// (next build overwrote it) and added a network round-trip.
+			//
+			// Order matters: spread `build_info` FIRST, then override with
+			// Central/credential-derived fields (firebase base64 vs raw,
+			// signing creds, request-time platforms, etc.) so the
+			// overrides win on key collision.
+			$app_config = array_merge( $build_info, [
 				// CLIENT local DB id (wp_appress_apps.id) — NOT Central post_id.
 				// Native code uses this to call /?appress=1&action=app.get_config&app_id=X
 				// on the CLIENT site. Central post_id is a different number.
 				'app_id'           => $app_id,
-				'title'            => $build_info['title']           ?? '',
-				'splash_bg_color'  => $build_info['splash_bg_color']  ?? '',
-				// Splash mode + companion settings. Build Engine bakes the
-				// chosen mode into the binary (strips the unused
-				// APPRESS-SPLASH-* block) so each app ships exactly one
-				// rendering path — extra source-level diversity on top of
-				// the user-facing choice.
-				'splash_type'             => $build_info['splash_type']             ?? 'default',
-				'splash_show_loading_bar' => isset( $build_info['splash_show_loading_bar'] )
-					? (bool) $build_info['splash_show_loading_bar']
-					: true,
-				'splash_image'            => $build_info['splash_image']            ?? '',
+				// Base64-encoded so binary Firebase config bytes survive
+				// JSON transport without escaping issues. Overrides the
+				// raw `build_info` values which were stored verbatim.
 				'firebase_android' => $b64_android,
 				'firebase_ios'     => $b64_ios,
-
-				'app_version'      => $build_info['app_version']      ?? '1.0.0',
-				'build_number'     => intval( $build_info['build_number'] ?? 1 ),
-				'logo'             => $build_info['logo']             ?? '',
-				'url'              => $build_info['url']              ?? '',
+				// Request-time platform selection (admin may build only
+				// android or only ios from the UI even if both are
+				// configured in `build_info`).
 				'platforms'        => $platforms,
 
 				// iOS signing — Team ID (public, from build_config) +
@@ -1004,7 +1004,6 @@ class Apps_Controller extends Base_Controller {
 				// Updates to fetch/create Development profile on the fly and
 				// sign the .ipa. The same key is reused to upload to
 				// TestFlight / App Store Connect post-build.
-				'apple_team_id'            => $build_info['apple_team_id']                ?? '',
 				'apple_appstore_key_id'    => $credentials['apple_appstore_key_id']       ?? '',
 				'apple_appstore_issuer_id' => $credentials['apple_appstore_issuer_id']    ?? '',
 				'apple_appstore_key_p8'    => $apple_p8_b64,
@@ -1022,7 +1021,7 @@ class Apps_Controller extends Base_Controller {
 
 				// Google Play auto-publish (premium — consumed if present).
 				'google_play_service_account_json' => $play_sa_b64,
-			];
+			] );
 
 			// POST the structured payload to Central — token is decrypted to plaintext for the HTTPS hop.
 			$response = wp_remote_post( $central_url . '/?my_appress=1&action=build.request', [
@@ -1102,6 +1101,54 @@ class Apps_Controller extends Base_Controller {
 						? $local_base . '&app_id=' . $post_id . '&build_id=' . $b['id'] . '&os=ios&_wpnonce=' . $dl_nonce
 						: '';
 				}
+			}
+
+			return wp_send_json( $body );
+		} catch ( \Exception $e ) {
+			return wp_send_json( [ 'success' => false, 'message' => $e->getMessage() ] );
+		}
+	}
+
+	/**
+	 * Proxy to Central `build.get_config` — returns the request-time
+	 * snapshot of the engine payload for a specific build_id, so the
+	 * admin UI can show exactly what config produced a given binary.
+	 * Sensitive credentials are redacted server-side on Central.
+	 */
+	protected function get_build_config() {
+		try {
+			$this->check_permissions();
+
+			$central_url = defined( 'APPRESS_CENTRAL_URL' ) ? APPRESS_CENTRAL_URL : '';
+			if ( empty( $central_url ) ) {
+				throw new \Exception( esc_html__( 'Central URL not defined.', 'appress' ) );
+			}
+
+			$build_id = intval( $_POST['build_id'] ?? 0 );
+			if ( $build_id <= 0 ) {
+				throw new \Exception( esc_html__( 'build_id is required.', 'appress' ) );
+			}
+
+			$proxy_body = [
+				'connection_token' => sanitize_text_field( wp_unslash( $_POST['connection_token'] ?? '' ) ),
+				'post_id'          => intval( $_POST['post_id'] ?? 0 ),
+				'build_id'         => $build_id,
+			];
+
+			$response = wp_remote_post( $central_url . '/?my_appress=1&action=build.get_config', [
+				'body'      => $proxy_body,
+				'timeout'   => 15,
+				'sslverify' => ! ( defined( 'APPRESS_IS_DEV' ) && \APPRESS_IS_DEV )
+			] );
+
+			if ( is_wp_error( $response ) ) {
+				/* translators: dynamic value injected into the message */
+				throw new \Exception( esc_html( sprintf( __( 'Central SaaS unreachable: %s', 'appress' ), $response->get_error_message() ) ) );
+			}
+
+			$body = json_decode( wp_remote_retrieve_body( $response ), true );
+			if ( json_last_error() !== JSON_ERROR_NONE || ! isset( $body['success'] ) ) {
+				throw new \Exception( esc_html__( 'Invalid response from Central SaaS.', 'appress' ) );
 			}
 
 			return wp_send_json( $body );
