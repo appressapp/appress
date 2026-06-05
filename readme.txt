@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.27
+Stable tag: 1.0.0.28
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.28 =
+* Fixed the in-app status bar height returning 0 when the app's status bar CSS variable was being inadvertently rewritten to a self-reference.
+* Apps with no screens configured now boot into the WordPress site's homepage instead of a blank screen.
 
 = 1.0.0.27 =
 * Improved compatibility with App Store and Play Store review requirements.

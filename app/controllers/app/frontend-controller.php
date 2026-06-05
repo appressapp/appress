@@ -186,6 +186,19 @@ class Frontend_Controller extends Base_Controller
 
 			$live_config['update_hash'] = $server_version;
 
+			// Synthetic home-screen fallback. When an admin creates an
+			// app but doesn't add any screens (or adds screens with no
+			// `role=home` / no usable URL), native bootstrap would
+			// otherwise land on a blank master WebView with nothing to
+			// load. Detect that situation here and inject a
+			// home-flagged screen pointing at the WP site's `home_url()`
+			// so the app boots into the customer's homepage. Plays
+			// nicely with `single-screen mode`: when there are no
+			// other tabs we force `bottom_navigation.enabled = false`
+			// so the nav stays hidden and the synthetic tab fills
+			// the screen edge-to-edge (Safari-style).
+			$this->ensure_home_screen_fallback( $live_config );
+
 			// Normalized + filter-merged list, same helper the in-page
 			// `wp_head` script uses — single source of truth so native
 			// cache + fresh page render can't drift.
@@ -230,5 +243,119 @@ class Frontend_Controller extends Base_Controller
 				'message' => $e->getMessage()
 			]);
 		}
+	}
+
+	/**
+	 * Guarantee at least ONE bootable screen exists in the boot payload.
+	 *
+	 * Walks `bottom_navigation.items`, resolves each item's effective URL
+	 * + role (either directly or via the linked `app_screens` row), and
+	 * looks for a screen flagged `role=home` with a non-empty URL. When
+	 * none is found, prepends a synthetic home screen + matching tab
+	 * pointing at the WP site's `home_url()`. Mutates `$live_config` in
+	 * place — native bootstrap then sees a valid default screen and
+	 * boots the app into the customer's homepage instead of a blank
+	 * master WebView.
+	 *
+	 * Empty admin config (the trigger case) → also hides the bottom nav
+	 * by forcing `bottom_navigation.enabled = false`, so the synthetic
+	 * tab fills the screen edge-to-edge rather than rendering a 1-item
+	 * nav bar nobody asked for.
+	 *
+	 * Idempotent + cache-safe. The `update_time_hash` is computed off
+	 * the admin's saved config (before this fallback runs), so the
+	 * "up_to_date" branch above never short-circuits this code; once
+	 * native receives the synthesized config, subsequent boots match
+	 * the same hash and reuse the cached fallback.
+	 */
+	private function ensure_home_screen_fallback( array &$live_config ): void {
+		$footer       = (array) ( $live_config['bottom_navigation'] ?? [] );
+		$footer_items = (array) ( $footer['items'] ?? [] );
+		$app_screens  = (array) ( $live_config['app_screens'] ?? [] );
+
+		// Build an `_id => screen` lookup for O(1) screen_id resolution.
+		$screens_by_id = [];
+		foreach ( $app_screens as $s ) {
+			if ( is_array( $s ) ) {
+				$sid = (string) ( $s['_id'] ?? '' );
+				if ( $sid !== '' ) {
+					$screens_by_id[ $sid ] = $s;
+				}
+			}
+		}
+
+		// A "viable default" = any item that resolves to a non-empty URL
+		// AND carries role=home (either on the item itself or on the
+		// linked app_screens row).
+		$has_viable_default = false;
+		foreach ( $footer_items as $item ) {
+			if ( ! is_array( $item ) ) continue;
+			$item_url = trim( (string) ( $item['url'] ?? '' ) );
+			$item_role = (string) ( $item['role'] ?? '' );
+			$screen_id = (string) ( $item['screen_id'] ?? '' );
+
+			$effective_url  = $item_url;
+			$effective_role = $item_role;
+			if ( $screen_id !== '' && isset( $screens_by_id[ $screen_id ] ) ) {
+				$linked = $screens_by_id[ $screen_id ];
+				$linked_url = trim( (string) ( $linked['url'] ?? '' ) );
+				if ( $linked_url !== '' ) $effective_url = $linked_url;
+				$linked_role = (string) ( $linked['role'] ?? '' );
+				if ( $linked_role !== '' ) $effective_role = $linked_role;
+			}
+
+			if ( $effective_url !== '' && $effective_role === 'home' ) {
+				$has_viable_default = true;
+				break;
+			}
+		}
+
+		if ( $has_viable_default ) return;
+
+		// Build the synthetic fallback. Mirror the schema-defined
+		// repeater shape so downstream consumers (CssService,
+		// integrations' filter implementations, TranslatePress URL
+		// rewriter) see a normal-looking row.
+		$home_url = home_url( '/' );
+		$synthetic_screen_id = 'home_fallback';
+		$synthetic_screen = [
+			'_id'                => $synthetic_screen_id,
+			'wp_id'              => '',
+			'type'               => 'custom_url',
+			'title'              => __( 'Home', 'appress' ),
+			'url'                => $home_url,
+			'icon'               => '',
+			'role'               => 'home',
+			'reload_on_click'    => true,
+			'always_reload'      => false,
+			'show_web_header'    => false,
+			'show_web_footer'    => false,
+			'use_general_config' => true,
+			'pull_to_refresh'    => false,
+			'offline'            => true,
+			'preload'            => false,
+		];
+		$synthetic_tab = [
+			'_id'         => 'home_fallback_tab',
+			'title'       => '',
+			'icon'        => '',
+			'type'        => 'screen',
+			'screen_id'   => $synthetic_screen_id,
+			'url'         => $home_url,
+			'menu_target' => 'left',
+			'indicator'   => 'none',
+		];
+
+		$live_config['app_screens'] = array_merge( [ $synthetic_screen ], $app_screens );
+		$footer['items']            = array_merge( [ $synthetic_tab ], $footer_items );
+
+		// Admin had no tabs at all → hide the nav so a single-item bar
+		// doesn't render. If admin already had some tabs but just no
+		// role=home one, leave `enabled` alone (their nav stays).
+		if ( empty( $footer_items ) ) {
+			$footer['enabled'] = false;
+		}
+
+		$live_config['bottom_navigation'] = $footer;
 	}
 }

@@ -125,18 +125,18 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
                 'window.' . $ns,
                 $buffer
             );
-            // CSS custom property — the binary's runtime injection
-            // writes the salted custom property name. Customer
-            // stylesheets in static .css files still read literal
-            // `var(--appress-status-bar-height)` and resolve through
-            // the `:root{…}` alias emitted by `emit_native_class_ids`;
-            // PHP-emitted inline CSS goes through this buffer and gets
-            // rewritten so the alias isn't needed for them.
-            $buffer = str_replace(
-                '--appress-status-bar-height',
-                '--' . $salt_lc . '-status-bar-height',
-                $buffer
-            );
+            // `--appress-status-bar-height` is intentionally NOT
+            // rewritten here. Everything in the page (customer's
+            // compiled .css, plugin heredoc inline CSS, theme builder
+            // output) reads the literal name and resolves through the
+            // `:root{--appress-status-bar-height:var(--<salt_lc>-…,0px)}`
+            // alias `emit_native_class_ids` prints at wp_head priority 1.
+            // A previous version of this buffer ran a blanket
+            // `str_replace('--appress-status-bar-height', '--<salt_lc>-…')`
+            // and clobbered the alias's own LHS in-place, producing a
+            // self-referential `:root{--<salt_lc>-…:var(--<salt_lc>-…,0px)}`
+            // that resolves to the 0px fallback and breaks every
+            // `var(--appress-status-bar-height)` consumer downstream.
             return $buffer;
         } );
     }
