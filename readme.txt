@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.29
+Stable tag: 1.0.0.30
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.30 =
+* Custom CSS rules added by theme and builder integrations now ship with every build alongside the CSS you typed in the Build Config tab — previously only the textarea content was being saved.
+* Fixed an in-app issue where the "Appress" namespace alias used by integration scripts was being rewritten to a self-reference, causing a script error and a blank screen on some sites.
+
 = 1.0.0.29 =
 * Builds are now an exact snapshot of your full app configuration — every screen, menu, color, and feature toggle travels with the build instead of being refetched at build time.
 * New "Config" button on each build in the Builds tab shows the exact configuration that produced the .apk / .ipa, with credentials redacted.
@@ -276,6 +280,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.30 =
+Custom CSS from theme/builder integrations is now included in every build, and fixes a blank-screen bug on sites with certain integration scripts.
 
 = 1.0.0.20 =
 Adds a 4-step onboarding tour for new apps with an animated phone mockup and "Go to section" / "Read docs" buttons on every slide. Removes the unused AdMob fields from the app settings page.

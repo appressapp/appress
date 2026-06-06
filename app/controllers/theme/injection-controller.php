@@ -172,7 +172,23 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
         $ns_js  = wp_json_encode( $salt );
         $css_js = wp_json_encode( $salt_lc );
         echo "<script>(function(){var NS={$ns_js},CP={$css_js};if(NS==='Appress')return;"
-            . "window[NS]=window[NS]||window.Appress||{};window.Appress=window[NS];"
+            // The boundary buffer (`start_boundary_buffer` above) rewrites
+            // every literal `window.Appress` it sees in plugin-emitted
+            // output to the salted form. That's correct for static .js
+            // widget heredocs that need to read the salted namespace,
+            // but it CLOBBERS this alias script — the whole point of
+            // which is to set `window.Appress` to the salted namespace
+            // so customer plugin JS that calls bare `Appress.foo` keeps
+            // working. Without the rewrite, both sides of `=` were
+            // salted, producing a self-referential `window.<salt> =
+            // window.<salt>` no-op and a "Appress is not defined"
+            // ReferenceError on every page (with the customer-app's
+            // master WebView serving the customer site directly, this
+            // turned the entire app screen white). Bracket notation
+            // (`window['Appress']`) sidesteps the `\bwindow\.Appress`
+            // regex completely while compiling to the identical
+            // property access at runtime.
+            . "window[NS]=window[NS]||window['Appress']||{};window['Appress']=window[NS];"
             . "var MAP={'appress-open-menu':CP+'-open-menu','appress-open-right-menu':CP+'-open-right-menu',"
             . "'appress-qr-scanner-trigger':CP+'-qr-scanner-trigger',"
             . "'appress-dismiss-first-launch-screen':CP+'-dismiss-first-launch-screen',"

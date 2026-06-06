@@ -534,6 +534,23 @@ class Apps_Controller extends Base_Controller {
 			// Push backup to Central SaaS (fire-and-forget, non-blocking).
 			// Token in DB is encrypted at-rest → decrypt before sending plaintext over HTTPS.
 			$backup_build   = json_decode( $update_payload['build_config'] ?? '{}', true ) ?: [];
+			// Apply the `appress/app/css` filter chain so integration
+			// hooks (Voxel, Elementor, WooCommerce — each registers via
+			// `\Appress\get_app_css`'s filter slot) can append their
+			// CSS rules to whatever the admin typed in the textarea
+			// before the payload ships to Central. Without this pass
+			// the only CSS that reaches the build engine is the raw
+			// admin textarea — every theme/builder integration's
+			// styling is silently dropped (user-reported "mày làm hư
+			// cái app css của tao" was actually integration CSS
+			// missing, not the native rendering). DB row is left
+			// untouched (rate-of-change should reflect admin edits, not
+			// hook output); only the wire payload to Central is
+			// enriched.
+			$filtered_css = \Appress\get_app_css( $app_id );
+			$backup_build['css_all']     = $filtered_css['css_all'];
+			$backup_build['css_android'] = $filtered_css['css_android'];
+			$backup_build['css_ios']     = $filtered_css['css_ios'];
 			$plain_token    = \Appress\decrypt( (string) $row['connection_token'] );
 			wp_remote_post( APPRESS_CENTRAL_URL . '/?my_appress=1&action=app.update_config', [
 				'headers'   => [ 'Content-Type' => 'application/json' ],
