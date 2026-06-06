@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.30
+Stable tag: 1.0.0.31
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -143,6 +143,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 == Changelog ==
 
+= 1.0.0.31 =
+* Custom CSS — both the textarea you fill in and any rules added by theme or builder integrations — now applies inside the app in real time. Edit, save, and reload the app to see your changes; no new build required.
+
 = 1.0.0.30 =
 * Custom CSS rules added by theme and builder integrations now ship with every build alongside the CSS you typed in the Build Config tab — previously only the textarea content was being saved.
 * Fixed an in-app issue where the "Appress" namespace alias used by integration scripts was being rewritten to a self-reference, causing a script error and a blank screen on some sites.
@@ -280,6 +283,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.31 =
+Custom CSS edits now apply inside the app in real time — no new build needed.
 
 = 1.0.0.30 =
 Custom CSS from theme/builder integrations is now included in every build, and fixes a blank-screen bug on sites with certain integration scripts.

@@ -41,6 +41,23 @@ class Frontend_Controller extends Base_Controller
 		// (b) user opens app while already logged-in → not detected here, but ANY
 		//     authenticated request from the app surfaces the UA, so wp_login is
 		//     the canonical entry that distinguishes "first install" reliably.
+		// Print the customer's App CSS (admin textarea + every
+		// `appress/app/css` filter hook from integrations like Voxel,
+		// Elementor, WooCommerce) into `<head>` whenever the page is
+		// being rendered inside the native app. Priority 5 so this
+		// lands after Rank Math / theme priority-0 SEO meta but before
+		// the default `wp_print_styles`/`wp_print_head_scripts` at
+		// priority 9/10 — guarantees the rules cascade-win over the
+		// site's own theme CSS without needing `!important`. Replaces
+		// the previous build-time bake (`css_all` / `css_ios` /
+		// `css_android` fields shipped through Central into the
+		// `AppressBakedConfig` blob then injected via
+		// `AppressCssService`). PHP is always-live: admin save → next
+		// page load in the app has the new CSS, no rebuild needed,
+		// existing installed apps benefit immediately when an
+		// integration adds rules.
+		$this->on('wp_head', '@print_app_css', 5);
+
 		$this->on('wp_login', '@detect_first_install_on_login', 10, 2);
 
 		// Async dispatcher: scheduled by the detector below; runs in cron so any
@@ -51,6 +68,65 @@ class Frontend_Controller extends Base_Controller
 		// recipes, analytics hooks, and last-active writes don't block the
 		// synchronous response the native app is waiting for.
 		$this->on('appress/app/booted_async', '@dispatch_booted_event', 10, 3);
+	}
+
+	/**
+	 * Emit the per-app stylesheet inside `<head>` when the page is
+	 * being rendered for the native app. Combines:
+	 *   - `css_all`     — admin textarea (always applied)
+	 *   - `css_ios`     — iOS-only admin textarea (when UA is iOS)
+	 *   - `css_android` — Android-only admin textarea (when UA is Android)
+	 *   - every rule appended by integrations via the
+	 *     `appress/app/css` filter (Voxel button overrides, Elementor
+	 *     theme-builder rules, WooCommerce account-page tweaks, etc.).
+	 *
+	 * The helper {@see \Appress\get_app_css()} runs all three slots
+	 * through the filter chain. Platform routing is then driven by the
+	 * app's UA — `iPhone`/`iPad`/`Android` substring match — so the
+	 * customer's css_ios block doesn't ship to Android users and
+	 * vice versa.
+	 *
+	 * Output skipped when:
+	 *   - request isn't coming from the native app (no UA marker),
+	 *   - no app row matches the UA-embedded id, or
+	 *   - every slot ends up empty after the filter chain (no admin
+	 *     CSS + no integration hooks contributed).
+	 */
+	protected function print_app_css()
+	{
+		$app_id = \Appress\get_current_app_id();
+		if ( $app_id <= 0 ) {
+			return; // not an app request
+		}
+
+		$css = \Appress\get_app_css( $app_id );
+		$rules = trim( (string) ( $css['css_all'] ?? '' ) );
+
+		$ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+		if ( stripos( $ua, 'iPhone' ) !== false || stripos( $ua, 'iPad' ) !== false ) {
+			$platform_rules = trim( (string) ( $css['css_ios'] ?? '' ) );
+			if ( $platform_rules !== '' ) {
+				$rules .= "\n" . $platform_rules;
+			}
+		} elseif ( stripos( $ua, 'Android' ) !== false ) {
+			$platform_rules = trim( (string) ( $css['css_android'] ?? '' ) );
+			if ( $platform_rules !== '' ) {
+				$rules .= "\n" . $platform_rules;
+			}
+		}
+
+		$rules = trim( $rules );
+		if ( $rules === '' ) {
+			return; // nothing to emit
+		}
+
+		// Inline tag, no enqueue — `wp_add_inline_style` would need a
+		// parent handle and we don't enqueue a stylesheet at all here.
+		// `</style>` inside `$rules` would break the closing tag; the
+		// admin sanitize callback strips it, but defense-in-depth.
+		$safe = str_replace( '</style', '<\/style', $rules );
+
+		echo "<style id=\"appress-app-css\">\n" . $safe . "\n</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS body sanitized by schema + admin only.
 	}
 
 	protected function detect_first_install_on_login($user_login, $user)

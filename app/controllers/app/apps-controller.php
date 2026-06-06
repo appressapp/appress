@@ -534,23 +534,10 @@ class Apps_Controller extends Base_Controller {
 			// Push backup to Central SaaS (fire-and-forget, non-blocking).
 			// Token in DB is encrypted at-rest → decrypt before sending plaintext over HTTPS.
 			$backup_build   = json_decode( $update_payload['build_config'] ?? '{}', true ) ?: [];
-			// Apply the `appress/app/css` filter chain so integration
-			// hooks (Voxel, Elementor, WooCommerce — each registers via
-			// `\Appress\get_app_css`'s filter slot) can append their
-			// CSS rules to whatever the admin typed in the textarea
-			// before the payload ships to Central. Without this pass
-			// the only CSS that reaches the build engine is the raw
-			// admin textarea — every theme/builder integration's
-			// styling is silently dropped (user-reported "mày làm hư
-			// cái app css của tao" was actually integration CSS
-			// missing, not the native rendering). DB row is left
-			// untouched (rate-of-change should reflect admin edits, not
-			// hook output); only the wire payload to Central is
-			// enriched.
-			$filtered_css = \Appress\get_app_css( $app_id );
-			$backup_build['css_all']     = $filtered_css['css_all'];
-			$backup_build['css_android'] = $filtered_css['css_android'];
-			$backup_build['css_ios']     = $filtered_css['css_ios'];
+			// Strip user CSS — printed live at request time via the
+			// `wp_head` hook now. See `request_build` for the full
+			// rationale.
+			unset( $backup_build['css_all'], $backup_build['css_ios'], $backup_build['css_android'] );
 			$plain_token    = \Appress\decrypt( (string) $row['connection_token'] );
 			wp_remote_post( APPRESS_CENTRAL_URL . '/?my_appress=1&action=app.update_config', [
 				'headers'   => [ 'Content-Type' => 'application/json' ],
@@ -957,6 +944,21 @@ class Apps_Controller extends Base_Controller {
 
 			$build_info = ! empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 			if ( ! is_array( $build_info ) ) $build_info = [];
+
+			// User CSS (css_all / css_ios / css_android) is now emitted
+			// by the plugin at request time via the `wp_head` printer
+			// (`Frontend_Controller::print_app_css`) — always live,
+			// runs every `appress/app/css` integration hook. Stripping
+			// these from the build payload here:
+			//   1. Trims a few KB from every build job's transport.
+			//   2. Removes a stale frozen-at-build-time snapshot that
+			//      can never be in sync with the live PHP path (so a
+			//      build engine bug that accidentally re-injects it
+			//      can't confuse future debugging).
+			//   3. Forces native to a single source of truth.
+			// Admin textarea values stay in the DB row — they're the
+			// input to `get_app_css()` which the wp_head printer reads.
+			unset( $build_info['css_all'], $build_info['css_ios'], $build_info['css_android'] );
 
 			// Signing credentials live in the encrypted `credentials` JSON
 			// column. Decrypt here for transit to Central over HTTPS — Central
