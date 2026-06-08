@@ -559,7 +559,7 @@ class Apps_Controller extends Base_Controller {
 					// twice on disk for one upgrade cycle.
 					'config'              => $backup_build,
 					'signing_secret'      => $signing_secret,
-				] ),
+				], JSON_UNESCAPED_UNICODE ),
 				'timeout'   => 0.01,
 				'blocking'  => false,
 				'sslverify' => ! ( defined( 'APPRESS_IS_DEV' ) && \APPRESS_IS_DEV )
@@ -1057,7 +1057,18 @@ class Apps_Controller extends Base_Controller {
 				'body'      => [
 					'connection_token' => \Appress\decrypt( (string) $row['connection_token'] ),
 					'post_id'          => intval( $_POST['post_id'] ?? 0 ),
-					'app_config'       => wp_json_encode( $app_config ),
+					// JSON_UNESCAPED_UNICODE ships Vietnamese / CJK / Cyrillic / etc.
+					// as raw UTF-8 bytes instead of `á` escapes. Without
+					// the flag, the body is URL-encoded by `wp_remote_post`,
+					// reaches Central, and Central's `wp_unslash($_POST)`
+					// strips the leading `\` of every Unicode escape — so
+					// `Khám phá` arrives at the build engine as the
+					// literal string `Khu00e1m phá` and ships into the
+					// app's bottom-nav title verbatim. Customer build_1206
+					// (bottom_navigation items: Khám phá / Đã lưu / Tài
+					// khoản) surfaced this; all three titles arrived with
+					// every `\u…` reduced to `u…`.
+					'app_config'       => wp_json_encode( $app_config, JSON_UNESCAPED_UNICODE ),
 				],
 				'timeout'   => 15,
 				'sslverify' => ! ( defined( 'APPRESS_IS_DEV' ) && \APPRESS_IS_DEV )

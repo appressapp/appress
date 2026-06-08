@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.32
+Stable tag: 1.0.0.33
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.33 =
+* Fixed Vietnamese / non-ASCII characters in bottom nav titles, side menu labels, and other text fields appearing as garbled Unicode escapes inside the app.
 
 = 1.0.0.32 =
 * TranslatePress integration is now opt-in via a Native Features toggle.
