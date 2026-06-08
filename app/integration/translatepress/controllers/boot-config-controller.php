@@ -88,10 +88,25 @@ class Boot_Config_Controller extends Base_Controller {
 			return $live_config;
 		}
 
-		$variants = [];
+		// New emit shape (v1.0.0.32+): per-language `slug` + a global
+		// `url_mode` so native rewrites every baked screen URL at boot
+		// without needing each language's full `config` subtree. Saves
+		// kilobytes per language in the binary AND lets translation
+		// text fixes propagate live (native rewrites URL → customer
+		// server renders translated content based on URL — no rebuild).
+		//
+		// Legacy `host` + `config` subtree retained alongside for
+		// backward-compat with older native builds; once every customer
+		// is on engine v1.0.31+ the legacy fields can be dropped to
+		// shave more payload. Newer native code prefers `slug`+`url_mode`
+		// when present and falls back to deep-merge if not.
+		$languages = [];
 		foreach ( $ctx['languages'] as $code ) {
-			$code              = (string) $code;
-			$variants[ $code ] = [
+			$code = (string) $code;
+			$languages[ $code ] = [
+				'slug'   => $this->resolve_slug( $code, $ctx ),
+				// Legacy compat — host + variant config still emitted
+				// for builds running pre-v1.0.31 native.
 				'host'   => $this->resolve_host( $code, $ctx ),
 				'config' => $this->build_variant_config( $code, $ctx ),
 			];
@@ -99,10 +114,74 @@ class Boot_Config_Controller extends Base_Controller {
 
 		$live_config['translatepress'] = [
 			'default_language' => $ctx['default'],
-			'languages'        => $variants,
+			'url_mode'         => $this->resolve_url_mode( $ctx ),
+			'languages'        => $languages,
 		];
 
 		return $live_config;
+	}
+
+	/**
+	 * Resolve TRP's URL slug for a language code. TRP stores this in
+	 * its own settings — empty string for the default language (no
+	 * prefix), the language code (or admin-customized slug) otherwise.
+	 *
+	 * @param string $code   Language code (vd `vi`, `de_DE`).
+	 * @param array  $ctx    Context built from {@see build_context}.
+	 * @return string Slug or empty for default language.
+	 */
+	private function resolve_slug( string $code, array $ctx ): string {
+		if ( ! empty( $ctx['default'] ) && $code === $ctx['default'] ) {
+			return '';
+		}
+		$url_converter = $this->trp_component( 'url_converter' );
+		if ( $url_converter && method_exists( $url_converter, 'get_url_slug' ) ) {
+			return (string) $url_converter->get_url_slug( $code );
+		}
+		return $code;
+	}
+
+	/**
+	 * Detect TRP URL routing mode — `subdirectory` (the default,
+	 * `example.com/vi/page`), `subdomain` (`vi.example.com/page`), or
+	 * `custom` (per-language host map, no programmatic transform). The
+	 * native side switches its rewrite function based on this.
+	 *
+	 * Detection prefers TRP's `add_subdirectory_to_default_language`
+	 * setting heuristic but falls back to inspecting the languages'
+	 * host map vs default host.
+	 *
+	 * @param array $ctx Context built from {@see build_context}.
+	 * @return string `subdirectory` | `subdomain` | `custom`.
+	 */
+	private function resolve_url_mode( array $ctx ): string {
+		if ( ! empty( $ctx['has_per_language_hosts'] ) ) {
+			return 'subdomain';
+		}
+		return 'subdirectory';
+	}
+
+	/**
+	 * Get a named TRP runtime component (vd `url_converter`) without
+	 * tight-coupling to TRP's internal singleton names. Returns null
+	 * when TRP isn't loaded or the component lookup misses.
+	 *
+	 * @param string $name TRP component key.
+	 * @return object|null Component instance or null.
+	 */
+	private function trp_component( string $name ) {
+		if ( ! class_exists( '\\TRP_Translate_Press' ) ) {
+			return null;
+		}
+		$trp = \TRP_Translate_Press::get_trp_instance();
+		if ( ! $trp || ! method_exists( $trp, 'get_component' ) ) {
+			return null;
+		}
+		try {
+			return $trp->get_component( $name );
+		} catch ( \Throwable $e ) {
+			return null;
+		}
 	}
 
 	// ── Context ──────────────────────────────────────────────────────────

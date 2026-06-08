@@ -338,13 +338,31 @@ return [
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Open links in a subscreen', 'appress' ),
+						'label' => __( 'Subscreen', 'appress' ),
 						'sanitize' => 'boolean',
 						'default' => true,
 						'ui' => [
 							'group' => 'native_features',
-							'hint' => __( 'When OFF, link taps replace the current page in-place instead of pushing a modal subscreen on top.', 'appress' ),
 							'doc_url' => 'https://docs.appress.app/native-features/subscreen'
+						]
+					],
+				]
+			],
+
+			'translatepress' => [
+				'type' => 'object',
+				'label' => __( 'TranslatePress', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => false ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Enable TranslatePress', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => false,
+						'ui' => [
+							'group' => 'native_features',
+							'doc_url' => 'https://docs.appress.app/integrations/translatepress'
 						]
 					],
 				]

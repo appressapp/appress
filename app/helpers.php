@@ -388,6 +388,188 @@ function get_app_css( $app_id = 0 ) {
 }
 
 /**
+ * Resolve the merged list of ad-network hostnames to block inside the
+ * native app's WebView, for a given app row. Pulls the admin's `disable_web_ads`
+ * toggle + per-platform checkboxes + custom hosts list, expands each
+ * checked preset to its canonical hostnames, then runs the result through
+ * the `appress/app/ads_excluded_hosts` filter so integrations
+ * (Voxel-marketplace, WooCommerce embedded ads, child theme overrides)
+ * can append entries without rebuilding the app.
+ *
+ * Empty array means "blocking disabled or nothing configured" — the
+ * `wp_head` printer treats that as a no-emit.
+ *
+ * @param int $app_id Target app row in `wp_appress_apps`.
+ * @return string[] Lower-cased, trimmed, deduped hostname list.
+ */
+function get_disable_web_ads_hosts( $app_id = 0 ) {
+	$app_id = (int) $app_id;
+	if ( $app_id <= 0 ) {
+		return [];
+	}
+
+	global $wpdb;
+	$raw = $wpdb->get_var( $wpdb->prepare(
+		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		$app_id
+	) );
+	$cfg = $raw ? json_decode( $raw, true ) : [];
+	if ( ! is_array( $cfg ) ) {
+		$cfg = [];
+	}
+
+	// Master gate — admin must opt in. Without this the feature is off
+	// regardless of platform checkboxes / custom hosts list.
+	if ( empty( $cfg['disable_web_ads'] ) ) {
+		return [];
+	}
+
+	// Canonical preset → hostname list. MUST match
+	// `AppressAdsExcludeService::presets` (iOS + Android removed in
+	// favor of this PHP path, but the platform key set is the contract
+	// the schema's checkbox field emits — keep them in sync if either
+	// side adds a network). Matching on app side is "host contains
+	// entry" (case-insensitive) so both apex and subdomain variants
+	// resolve with one line.
+	$presets = [
+		'adsense' => [
+			'googlesyndication.com',
+			'doubleclick.net',
+			'googleadservices.com',
+			'adtrafficquality.google',
+		],
+		'header_bidding' => [
+			'prebid.org',
+			'appnexus.com',
+			'adnxs.com',
+			'pubmatic.com',
+			'rubiconproject.com',
+			'openx.net',
+			'indexexchange.com',
+			'casalemedia.com',
+		],
+		'ezoic' => [ 'ezoic.net', 'ezoic.com', 'ezodn.com', 'ezoiccdn.com' ],
+		'mediavine' => [ 'mediavine.com' ],
+		'raptive' => [ 'adthrive.com', 'raptive.com' ],
+		'media_net' => [ 'media.net' ],
+		'taboola_outbrain' => [ 'taboola.com', 'outbrain.com' ],
+		'amazon_ads' => [ 'amazon-adsystem.com' ],
+		'criteo' => [ 'criteo.com', 'criteo.net' ],
+	];
+
+	$hosts = [];
+	$platforms = isset( $cfg['disable_web_ads_platforms'] ) && is_array( $cfg['disable_web_ads_platforms'] )
+		? $cfg['disable_web_ads_platforms']
+		: [];
+	foreach ( $presets as $key => $list ) {
+		if ( ! empty( $platforms[ $key ] ) ) {
+			$hosts = array_merge( $hosts, $list );
+		}
+	}
+
+	// Custom hosts textarea — one per line. Strip scheme + path + leading
+	// wildcard so each line normalizes to a bare hostname (the WebView
+	// matcher uses substring containment so apex/subdomain both match).
+	$custom = isset( $cfg['disable_web_ads_custom_hosts'] ) ? (string) $cfg['disable_web_ads_custom_hosts'] : '';
+	foreach ( preg_split( '/[\r\n]+/', $custom ) as $line ) {
+		$h = strtolower( trim( $line ) );
+		if ( $h === '' ) continue;
+		if ( strpos( $h, 'https://' ) === 0 ) $h = substr( $h, 8 );
+		elseif ( strpos( $h, 'http://' ) === 0 ) $h = substr( $h, 7 );
+		if ( strpos( $h, '*.' ) === 0 ) $h = substr( $h, 2 );
+		$slash = strpos( $h, '/' );
+		if ( $slash !== false ) $h = substr( $h, 0, $slash );
+		if ( $h !== '' ) $hosts[] = $h;
+	}
+
+	/**
+	 * Filter: `appress/app/ads_excluded_hosts`
+	 *
+	 * Integration plugins (Voxel marketplace, WooCommerce embedded ads,
+	 * child theme custom block lists) can append hostnames here. Runs
+	 * AFTER preset expansion + custom textarea so integrations see the
+	 * full admin-derived baseline before adding their entries.
+	 *
+	 * @param string[] $hosts  Hostnames collected so far.
+	 * @param int      $app_id Target app row.
+	 */
+	$hosts = (array) apply_filters( 'appress/app/ads_excluded_hosts', $hosts, $app_id );
+
+	// Dedupe + drop empties + sort for deterministic output across requests.
+	$hosts = array_values( array_unique( array_filter( array_map( 'strval', $hosts ), function ( $h ) { return $h !== ''; } ) ) );
+	sort( $hosts );
+	return $hosts;
+}
+
+/**
+ * Resolve the Google Analytics tracking configuration for the native app
+ * — admin's app-owned GA4/gtag Measurement ID, the "exclude all web GA"
+ * master toggle, and the per-ID allow list used when the toggle is off.
+ *
+ * Result is plain values + an `appress/app/analytics_config` filter so
+ * integrations can override (vd: marketplace plugin force-attach extra
+ * event params, child theme inject a different GA ID for staging).
+ *
+ * Empty `ga_id` + `exclude_all = false` + `exclude_ids` empty means
+ * "no override at all" — the `wp_head` printer skips emit entirely so
+ * the customer's web-side GA loads unmodified.
+ *
+ * @param int $app_id Target app row in `wp_appress_apps`.
+ * @return array{ga_id:string, exclude_all:bool, exclude_ids:string[]}
+ */
+function get_analytics_config( $app_id = 0 ) {
+	$out = [ 'ga_id' => '', 'exclude_all' => false, 'exclude_ids' => [] ];
+
+	$app_id = (int) $app_id;
+	if ( $app_id <= 0 ) {
+		return $out;
+	}
+
+	global $wpdb;
+	$raw = $wpdb->get_var( $wpdb->prepare(
+		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		$app_id
+	) );
+	$cfg = $raw ? json_decode( $raw, true ) : [];
+	if ( ! is_array( $cfg ) ) {
+		$cfg = [];
+	}
+
+	$out['ga_id']       = isset( $cfg['google_analytics_id'] ) ? trim( (string) $cfg['google_analytics_id'] ) : '';
+	$out['exclude_all'] = ! empty( $cfg['exclude_all_web_ga'] );
+
+	if ( ! $out['exclude_all'] && isset( $cfg['exclude_web_ga_ids'] ) ) {
+		foreach ( preg_split( '/[\r\n]+/', (string) $cfg['exclude_web_ga_ids'] ) as $line ) {
+			$id = trim( $line );
+			if ( $id !== '' ) {
+				$out['exclude_ids'][] = $id;
+			}
+		}
+		$out['exclude_ids'] = array_values( array_unique( $out['exclude_ids'] ) );
+	}
+
+	/**
+	 * Filter: `appress/app/analytics_config`
+	 *
+	 * Override any field of the analytics config block. Useful for:
+	 *   - injecting a staging GA ID via child theme,
+	 *   - augmenting `exclude_ids` with marketplace-specific trackers,
+	 *   - force-disabling app analytics for guest sessions.
+	 *
+	 * @param array $out    Resolved config (ga_id / exclude_all / exclude_ids).
+	 * @param int   $app_id Target app row.
+	 */
+	$out = (array) apply_filters( 'appress/app/analytics_config', $out, $app_id );
+
+	// Re-normalize after filter so integration plugins can't break shape.
+	return [
+		'ga_id'       => isset( $out['ga_id'] ) ? (string) $out['ga_id'] : '',
+		'exclude_all' => ! empty( $out['exclude_all'] ),
+		'exclude_ids' => isset( $out['exclude_ids'] ) && is_array( $out['exclude_ids'] ) ? array_values( array_map( 'strval', $out['exclude_ids'] ) ) : [],
+	];
+}
+
+/**
  * Detect whether the current request is coming from an Appress native app
  * (iOS or Android). Optionally scope the check to a single app id.
  *

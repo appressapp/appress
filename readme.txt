@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.31
+Stable tag: 1.0.0.32
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,11 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.32 =
+* TranslatePress integration is now opt-in via a Native Features toggle.
+* Disable Web Ads and Google Analytics changes apply instantly — no rebuild needed.
+* Cleaner labels in Build Config.
 
 = 1.0.0.31 =
 * Custom CSS — both the textarea you fill in and any rules added by theme or builder integrations — now applies inside the app in real time. Edit, save, and reload the app to see your changes; no new build required.

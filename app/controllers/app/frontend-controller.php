@@ -58,6 +58,27 @@ class Frontend_Controller extends Base_Controller
 		// integration adds rules.
 		$this->on('wp_head', '@print_app_css', 5);
 
+		// Block known web ad networks from loading inside the native app.
+		// Priority 0 emits the script BEFORE any other `wp_enqueue_script`
+		// (default priority 10) so the `document.createElement` override
+		// is in place when the page's own scripts start running — same
+		// timing guarantee `WKUserScript .atDocumentStart` used to give
+		// when this logic lived in `AppressAdsExcludeService`. Moving
+		// to PHP gets us live updates (admin save → next page applies,
+		// no rebuild) and a `appress/app/ads_excluded_hosts` filter for
+		// integration extensions.
+		$this->on('wp_head', '@print_ads_blocker_js', 0);
+
+		// App-owned Google Analytics + web GA blocking. Same priority-0
+		// rationale as the ads blocker — `document.createElement` override
+		// must be installed BEFORE the page's own analytics scripts run
+		// or web-side gtag/GTM stubs initialize against the unfiltered
+		// real `window.gtag`. Moved from native `AppressAnalyticsService`
+		// (Android-only — iOS had no equivalent so iOS users never got
+		// app-owned GA at all) to a single PHP path that covers both
+		// platforms identically.
+		$this->on('wp_head', '@print_analytics_js', 0);
+
 		$this->on('wp_login', '@detect_first_install_on_login', 10, 2);
 
 		// Async dispatcher: scheduled by the detector below; runs in cron so any
@@ -127,6 +148,146 @@ class Frontend_Controller extends Base_Controller
 		$safe = str_replace( '</style', '<\/style', $rules );
 
 		echo "<style id=\"appress-app-css\">\n" . $safe . "\n</style>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS body sanitized by schema + admin only.
+	}
+
+	/**
+	 * Emit the ad-blocker JS bundle inside `<head>` when the page is
+	 * being rendered for the native app. Hooked at `wp_head` priority 0
+	 * so the inline `<script>` executes before any other enqueued page
+	 * script — the override of `document.createElement('script'|'iframe')`
+	 * has to be installed FIRST or page-emitted ad code runs unimpeded.
+	 *
+	 * No-emit cases:
+	 *   - request isn't from the native app (no UA marker → 0 app id),
+	 *   - `disable_web_ads` toggle is off in admin (helper returns []),
+	 *   - all platform checkboxes off + custom hosts empty (also []).
+	 *
+	 * The JS bundle mirrors the legacy native
+	 * `AppressAdsExcludeService::buildInjectionJs` shape so behavior
+	 * stays identical: createElement hook + ad-slot DOM nuker +
+	 * MutationObserver for dynamically inserted slots.
+	 */
+	protected function print_ads_blocker_js()
+	{
+		$app_id = \Appress\get_current_app_id();
+		if ( $app_id <= 0 ) {
+			return;
+		}
+
+		$hosts = \Appress\get_disable_web_ads_hosts( $app_id );
+		if ( empty( $hosts ) ) {
+			return;
+		}
+
+		// Encode the hostname list as a JS array literal. `wp_json_encode`
+		// gives us safe JSON ( `\u` for non-ASCII, escaped quotes) — a
+		// direct JS literal in a string-evaluated `<script>` context.
+		$hosts_json = wp_json_encode( array_values( $hosts ) );
+		if ( ! is_string( $hosts_json ) || $hosts_json === '' ) {
+			return;
+		}
+
+		// `nukeSlots` query catches every well-known ad slot wrapper
+		// shipped by Google AdManager, GAM, AdSense, Header Bidding's
+		// `<div id="div-gpt-ad-…">` pattern, and common data-attribute
+		// based slot markers. Kept inline so changing the list ships
+		// instantly with no JS-bundle build step.
+		$js = <<<'JS'
+(function(){
+  if(window.__appressAdsExcludeInit)return;window.__appressAdsExcludeInit=true;
+  var hosts=__HOSTS__;
+  function matchHost(v){if(typeof v!=='string')return false;var lv=v.toLowerCase();for(var i=0;i<hosts.length;i++){if(lv.indexOf(hosts[i])!==-1)return true;}return false;}
+  try{
+    var d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src')||Object.getOwnPropertyDescriptor(HTMLElement.prototype,'src');
+    var di=Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype,'src')||Object.getOwnPropertyDescriptor(HTMLElement.prototype,'src');
+    var oc=document.createElement.bind(document);
+    document.createElement=function(t){
+      var el=oc(t);
+      var tag=(t||'').toLowerCase();
+      if((tag==='script'||tag==='iframe')&&d&&d.set){
+        Object.defineProperty(el,'src',{configurable:true,set:function(v){try{if(matchHost(v))return;}catch(e){}(tag==='iframe'?di:d).set.call(this,v);},get:function(){return (tag==='iframe'?di:d).get.call(this);}});
+      }
+      return el;
+    };
+  }catch(e){}
+  function nukeSlots(root){try{
+    var q='ins.adsbygoogle,[id^="google_ads_iframe"],[id^="div-gpt-ad-"],[data-ad-client],[data-ad-slot]';
+    (root||document).querySelectorAll(q).forEach(function(n){n.remove();});
+  }catch(e){}}
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',function(){nukeSlots(document);});}else{nukeSlots(document);}
+  try{var mo=new MutationObserver(function(m){m.forEach(function(r){r.addedNodes&&r.addedNodes.forEach&&r.addedNodes.forEach(function(n){if(n.nodeType===1){nukeSlots(n);}});});});mo.observe(document.documentElement,{childList:true,subtree:true});}catch(e){}
+})();
+JS;
+		$js = str_replace( '__HOSTS__', $hosts_json, $js );
+
+		// Defensive: an admin pasting `</script>` into custom hosts
+		// would otherwise break out of our inline tag. wp_json_encode
+		// escapes the `/` only with JSON_HEX_TAG flag; cheaper to do a
+		// targeted str_replace here on the already-encoded string.
+		$js = str_replace( '</script', '<\/script', $js );
+
+		echo "<script id=\"appress-ads-blocker\">\n" . $js . "\n</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- hosts list JSON-encoded above; admin-only inputs.
+	}
+
+	/**
+	 * Emit the analytics JS bundle inside `<head>` when the page is
+	 * being rendered for the native app. Priority 0 so it lands before
+	 * the page's own analytics scripts — same browser-timing guarantee
+	 * the legacy native `WKUserScript .atDocumentStart` /
+	 * `WebViewCompat.addDocumentStartJavaScript` injection used to
+	 * provide. The override of `window.gtag` + `document.createElement`
+	 * has to be installed BEFORE the customer's enqueued analytics
+	 * scripts run.
+	 *
+	 * No-emit cases:
+	 *   - request isn't from the native app,
+	 *   - no app-owned GA ID, no `exclude_all_web_ga`, no `exclude_ids`
+	 *     (admin set nothing — no override desired, web GA passes through).
+	 */
+	protected function print_analytics_js()
+	{
+		$app_id = \Appress\get_current_app_id();
+		if ( $app_id <= 0 ) {
+			return;
+		}
+
+		$cfg = \Appress\get_analytics_config( $app_id );
+		// Short-circuit when nothing to do — no override, no overhead.
+		if ( $cfg['ga_id'] === '' && ! $cfg['exclude_all'] && empty( $cfg['exclude_ids'] ) ) {
+			return;
+		}
+
+		$ga_id_json    = wp_json_encode( $cfg['ga_id'] );
+		$exclude_all   = $cfg['exclude_all'] ? 'true' : 'false';
+		$exclude_json  = wp_json_encode( $cfg['exclude_ids'] );
+
+		// `window.dataLayer` + `window.gtag` shim mirrors the legacy
+		// `AppressAnalyticsService::buildInjectionJs` shape exactly so
+		// any plugin / theme JS that depends on `gtag` being present
+		// keeps working. createElement override blocks loading
+		// `googletagmanager.com/gtag/js?id=...` for any ID that's
+		// either in `excludeIds` or — when `excludeAll` is on — any ID
+		// that isn't the app's own.
+		$js = <<<'JS'
+(function(){
+  if(window.__appressGAInit)return;window.__appressGAInit=true;
+  var appId=__GA_ID__;
+  var excludeAll=__EXCLUDE_ALL__;
+  var excludeIds=__EXCLUDE_IDS__;
+  var allowed=appId?[appId]:[];
+  function blocked(id){if(!id)return false;if(allowed.indexOf(id)!==-1)return false;if(excludeAll)return true;return excludeIds.indexOf(id)!==-1;}
+  window.dataLayer=window.dataLayer||[];
+  window.gtag=function(){var a=Array.prototype.slice.call(arguments);if(a[0]==='config'&&blocked(a[1]))return;window.dataLayer.push(a);};
+  try{var d=Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype,'src')||Object.getOwnPropertyDescriptor(HTMLElement.prototype,'src');
+  var oc=document.createElement.bind(document);
+  document.createElement=function(t){var el=oc(t);if((t||'').toLowerCase()==='script'&&d&&d.set){Object.defineProperty(el,'src',{configurable:true,set:function(v){try{if(typeof v==='string'&&v.indexOf('googletagmanager.com/gtag/js')!==-1){var m=v.match(/[?&]id=([^&]+)/);if(m&&blocked(decodeURIComponent(m[1])))return;}}catch(e){}d.set.call(this,v);},get:function(){return d.get.call(this);}});}return el;};}catch(e){}
+  if(appId){try{var s=document.createElement('script');s.async=true;s.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(appId);(document.head||document.documentElement).appendChild(s);window.gtag('js',new Date());window.gtag('config',appId);}catch(e){}}
+})();
+JS;
+		$js = str_replace( [ '__GA_ID__', '__EXCLUDE_ALL__', '__EXCLUDE_IDS__' ], [ $ga_id_json, $exclude_all, $exclude_json ], $js );
+		$js = str_replace( '</script', '<\/script', $js );
+
+		echo "<script id=\"appress-analytics\">\n" . $js . "\n</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- values JSON-encoded; admin-only input.
 	}
 
 	protected function detect_first_install_on_login($user_login, $user)

@@ -538,6 +538,8 @@ class Apps_Controller extends Base_Controller {
 			// `wp_head` hook now. See `request_build` for the full
 			// rationale.
 			unset( $backup_build['css_all'], $backup_build['css_ios'], $backup_build['css_android'] );
+			unset( $backup_build['disable_web_ads'], $backup_build['disable_web_ads_platforms'], $backup_build['disable_web_ads_custom_hosts'] );
+			unset( $backup_build['google_analytics_id'], $backup_build['exclude_all_web_ga'], $backup_build['exclude_web_ga_ids'] );
 			$plain_token    = \Appress\decrypt( (string) $row['connection_token'] );
 			wp_remote_post( APPRESS_CENTRAL_URL . '/?my_appress=1&action=app.update_config', [
 				'headers'   => [ 'Content-Type' => 'application/json' ],
@@ -959,6 +961,14 @@ class Apps_Controller extends Base_Controller {
 			// Admin textarea values stay in the DB row — they're the
 			// input to `get_app_css()` which the wp_head printer reads.
 			unset( $build_info['css_all'], $build_info['css_ios'], $build_info['css_android'] );
+			// Web-ad blocker also moved to `wp_head` print (priority 0)
+			// — same rationale as CSS: live update, integration filter,
+			// single source of truth at request time.
+			unset( $build_info['disable_web_ads'], $build_info['disable_web_ads_platforms'], $build_info['disable_web_ads_custom_hosts'] );
+			// Analytics injection also runs via `wp_head` print now —
+			// strip the field group for the same reason: live update
+			// + integration filter + single source of truth.
+			unset( $build_info['google_analytics_id'], $build_info['exclude_all_web_ga'], $build_info['exclude_web_ga_ids'] );
 
 			// Signing credentials live in the encrypted `credentials` JSON
 			// column. Decrypt here for transit to Central over HTTPS — Central
