@@ -88,27 +88,23 @@ class Boot_Config_Controller extends Base_Controller {
 			return $live_config;
 		}
 
-		// New emit shape (v1.0.0.32+): per-language `slug` + a global
-		// `url_mode` so native rewrites every baked screen URL at boot
-		// without needing each language's full `config` subtree. Saves
-		// kilobytes per language in the binary AND lets translation
-		// text fixes propagate live (native rewrites URL → customer
-		// server renders translated content based on URL — no rebuild).
-		//
-		// Legacy `host` + `config` subtree retained alongside for
-		// backward-compat with older native builds; once every customer
-		// is on engine v1.0.31+ the legacy fields can be dropped to
-		// shave more payload. Newer native code prefers `slug`+`url_mode`
-		// when present and falls back to deep-merge if not.
+		// Per-language `slug` + a global `url_mode` — native rewrites
+		// every baked URL at boot without needing a full per-language
+		// `config` subtree. Saves kilobytes per language in the
+		// binary AND lets translation text fixes propagate live
+		// (native rewrites URL → customer server renders translated
+		// content based on URL → no rebuild needed for content
+		// edits). `labels` carries the admin-typed bottom-nav title
+		// override map (keyed by tab `_id`) since those don't follow
+		// a URL pattern — native swaps them in-place during the
+		// active-language apply.
 		$languages = [];
 		foreach ( $ctx['languages'] as $code ) {
 			$code = (string) $code;
 			$languages[ $code ] = [
 				'slug'   => $this->resolve_slug( $code, $ctx ),
-				// Legacy compat — host + variant config still emitted
-				// for builds running pre-v1.0.31 native.
 				'host'   => $this->resolve_host( $code, $ctx ),
-				'config' => $this->build_variant_config( $code, $ctx ),
+				'labels' => $this->resolve_nav_labels( $code, $ctx ),
 			];
 		}
 
@@ -119,6 +115,25 @@ class Boot_Config_Controller extends Base_Controller {
 		];
 
 		return $live_config;
+	}
+
+	/**
+	 * Per-tab title override map for the active language. Pulled from
+	 * the admin's `translatepress.strings` field (Vue tab editor) so
+	 * native can swap nav titles in-place without a full subtree
+	 * deep-merge. Returns `{ "<tab_id>": "<translated title>" }`.
+	 */
+	private function resolve_nav_labels( string $code, array $ctx ): array {
+		$out = [];
+		foreach ( $ctx['nav_items'] as $item ) {
+			$id = isset( $item['_id'] ) ? (string) $item['_id'] : '';
+			if ( $id === '' ) continue;
+			$translated = $ctx['labels'][ $id ][ $code ] ?? '';
+			if ( $translated !== '' ) {
+				$out[ $id ] = (string) $translated;
+			}
+		}
+		return $out;
 	}
 
 	/**
@@ -193,21 +208,15 @@ class Boot_Config_Controller extends Base_Controller {
 		if ( ! $this->translator->is_active() ) {
 			return null;
 		}
-		// Per-app opt-in gate. Site-wide TRP can be running (other plugins
-		// or the customer's own web frontend rely on it), but if the
-		// Appress admin has the per-app integration toggle OFF, the
-		// mobile app should not see the `translatepress` block at all.
-		// Without this gate, the native side's
-		// `applyVariantForActiveLanguage` still resolves the device
-		// locale to a TRP variant and points AppressRootUrl at the
-		// translated host — so an en_US device on a ka_GE-default site
-		// would see English content even though the admin explicitly
-		// disabled the integration. Returning null here means native
-		// falls back to the bundle URL and TRP's own server-side
-		// resolver picks the right language from cookies / browser
-		// hints / site default. Symmetric with the customer's mental
-		// model: "I turned it off → app is untouched by TRP."
-		if ( ! Settings_Controller::is_enabled_for_app( $app_id ) ) {
+		// Per-app opt-in gate. Source of truth = the `translatepress`
+		// object in the app's `build_config` (managed by the per-app
+		// TranslatePress sub-tab + the Native Features toggle). Toggle
+		// OFF here means: don't emit a `translatepress` block, native
+		// falls back to TRP's own server-side resolver. Symmetric with
+		// the customer's mental model: "I turned it off → app is
+		// untouched by TRP."
+		$tp_config = (array) ( $live_config['translatepress'] ?? [] );
+		if ( empty( $tp_config['enabled'] ) ) {
 			return null;
 		}
 		$settings = $this->translator->get_settings();
@@ -215,8 +224,7 @@ class Boot_Config_Controller extends Base_Controller {
 			return null;
 		}
 
-		$admin  = Settings_Controller::get_settings( $app_id );
-		$labels = ! empty( $admin['enabled'] ) ? (array) ( $admin['strings'] ?? [] ) : [];
+		$labels = (array) ( $tp_config['strings'] ?? [] );
 
 		return [
 			'default'          => (string) $settings['default_language'],
@@ -231,84 +239,21 @@ class Boot_Config_Controller extends Base_Controller {
 		];
 	}
 
-	// ── Variant build ────────────────────────────────────────────────────
+	// `build_variant_config`, `translate_nav_items`,
+	// `translate_screen_rows` retired — the v1.0.0.32+ emit shape
+	// ships `slug` + `url_mode` + `labels` only. Native rewrites
+	// URLs in-place via slug/mode and swaps nav titles via the
+	// labels map. No more per-language deep-merge subtree.
 
 	/**
-	 * Build the deep-merge override subtree for a language. Each section
-	 * is a full snapshot of the language-dependent root paths — Object-
-	 * assign / Object.merge / deepMerge style replacements on the native
-	 * side simply overwrite those branches without walking child fields.
+	 * Translated app_screens rows — retained only as a deprecated
+	 * helper for external integrations that may still reflect on
+	 * it. Internal callers (boot enrich, variant build) no longer
+	 * emit `app_screens` in the variant payload.
 	 *
-	 * Non-translated bottom_navigation settings (colors, font, etc.) stay
-	 * on the root config; we only ship `bottom_navigation.items` here.
-	 * Same logic for other sections: only the subkeys that actually carry
-	 * language-dependent values get emitted, so deep-merge doesn't wipe
-	 * sibling settings.
-	 */
-	private function build_variant_config( string $code, array $ctx ): array {
-		$config = [
-			'build_config' => [
-				'website_url' => $this->resolve_host( $code, $ctx ),
-			],
-			'bottom_navigation' => [
-				'items' => $this->translate_nav_items( $code, $ctx ),
-			],
-			'app_screens' => $this->translate_screen_rows( $code, $ctx ),
-		];
-
-		if ( $ctx['first_launch_url'] !== '' ) {
-			$config['first_launch'] = [
-				'url' => $this->translator->translate_url( $ctx['first_launch_url'], $code ),
-			];
-		}
-
-		return $config;
-	}
-
-	/**
-	 * Translated bottom-nav items. Only `title` is language-dependent
-	 * here — the Live Config UI for bottom nav offers `screen`
-	 * (linked via screen_id to an app_screens row) and `menu_toggle`
-	 * (opens the side menu drawer). Neither path uses tab.url, so the
-	 * url field is left untouched. URL translation for tab destinations
-	 * happens in {@see translate_screen_rows} (covers screen-linked
-	 * tabs) and the side-menu / role lookups native does at runtime.
-	 *
-	 * Every original field (icon, screen_id, type, indicator, custom_
-	 * indicator_*, ...) carries over via the copy so a native deep-
-	 * merge ends up with a fully usable item list — no orphan fields.
-	 */
-	private function translate_nav_items( string $code, array $ctx ): array {
-		$out = [];
-		foreach ( $ctx['nav_items'] as $item ) {
-			$copy = $item;
-			$id   = isset( $item['_id'] ) ? (string) $item['_id'] : '';
-			if ( $id !== '' && ! empty( $ctx['labels'][ $id ][ $code ] ) ) {
-				$copy['title'] = (string) $ctx['labels'][ $id ][ $code ];
-			}
-			$out[] = $copy;
-		}
-		return $out;
-	}
-
-	/**
-	 * Translated app_screens rows. Two screen shapes need different URL
-	 * resolution; both end up with a final `url` field native can load
-	 * straight after the deep-merge:
-	 *
-	 *   - type=`custom_url` — admin pasted a URL into `screen.url`.
-	 *     Translate it directly.
-	 *
-	 *   - type=`appress_screen` — admin picked a `Screens` CPT post via
-	 *     `screen.wp_id`. Native can't compute permalinks (PHP-only), so
-	 *     we resolve the post permalink here, then translate that. We
-	 *     also fold the resolved URL into `copy.url` so native treats
-	 *     both screen types uniformly (no `if (type == ...)` branches in
-	 *     mobile code).
-	 *
-	 * All other fields (wp_id, type, role, reload_on_click, ...) carry
-	 * over via the copy so native lookups by index keep working
-	 * post-merge.
+	 * @deprecated 1.4.0 schema split removed `app_screens`. Kept to
+	 *             preserve binary compat for plugins extending this
+	 *             class; will be removed in a future release.
 	 */
 	private function translate_screen_rows( string $code, array $ctx ): array {
 		$out = [];

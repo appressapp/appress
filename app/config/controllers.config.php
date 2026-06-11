@@ -69,6 +69,9 @@ return [
 	\Appress\Controllers\Screens\Seo_Controller::class,
 	\Appress\Controllers\Screens\Ajax_Controller::class,
 
+	// Post search endpoint (powers Content Source pickers in the admin)
+	\Appress\Controllers\Posts\Ajax_Controller::class,
+
 	// Native Login (Google x Appress Core)
 	\Appress\Controllers\Login\Google_Controller::class,
 

@@ -9,112 +9,62 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * TranslatePress integration entry point.
  *
- * Two layers of gating, by design (not redundant):
- *   1. Site-level toggle on the Integrations admin page (Features Manager
- *      writes to `appress_settings.modules.translatepress`). OFF = the
- *      integration is dormant for the whole site.
- *   2. Per-app toggle inside the integration's detail page
- *      (`?page=appress-integrations&integration=translatepress`). Stored
- *      by Settings_Controller. OFF = boot endpoint for that specific app
- *      doesn't get a `translatepress` block, even though the site-level
- *      toggle is ON.
+ * Gating model:
+ *   - Hard requirement: the TRP plugin must be active (`\TRP_Translate_Press`
+ *     class exists). Without it the integration stays dormant and the
+ *     per-app sub-tab + Native Features toggle hide themselves in the
+ *     admin Vue layer (driven by `Admin_Controller::collect_integration_status`).
+ *   - Per-app opt-in: `build_config.translatepress.enabled` — surfaced
+ *     as a toggle in the per-app Native Features grid + as the
+ *     conditionally-shown "TranslatePress" sub-tab under Settings
+ *     where admins edit per-language bottom-nav label overrides.
  *
- * What it does (when active):
- *   - Registers a card on the Integrations admin page so admins can
- *     toggle the integration site-wide and click through to configure
- *     per-app translations.
- *   - Hooks `appress/integrations/admin_template/translatepress` to
- *     render the detail page (per-app toggle + bottom-nav label
- *     translations + per-app clear-cache button).
+ * What it does (when active + per-app enabled):
  *   - Hooks `appress/app/live_config` (via Boot_Config_Controller) to
  *     inject a `translatepress` block with pre-resolved URL + label
  *     translation maps. Native consumes the maps so navigation +
  *     bottom-nav labels render in the active language without round-
  *     trips or 302 redirects.
+ *   - Registers the `[appress_trp_switcher]` shortcode for in-page
+ *     language pickers (admin places via page builder).
+ *   - Exposes mobile-side AJAX endpoints (`translatepress.{save,get}_user_language`)
+ *     so the in-app language switcher can persist a logged-in user's
+ *     choice across sessions via WP user meta.
  *
- * Hard gate: TRP plugin must be active. Without it, the card still
- * appears on the Integrations page but with a "install TranslatePress
- * first" CTA (via `requires_plugin`) — no boot-config enrichment runs.
+ * Note: the legacy `/appress-integrations` detail page and the
+ * site-level `appress_settings.modules.translatepress` master toggle
+ * were removed when the per-app sub-tab landed — every gate now lives
+ * on the per-app `build_config.translatepress.enabled` flag, which is
+ * the single source of truth Boot_Config_Controller consults.
  */
 class Translatepress_Controller extends \Appress\Controllers\Base_Controller {
 
 	protected function hooks() {
-		// Card registered unconditionally so the Integrations page can
-		// render the "install TranslatePress first" CTA via the
-		// `requires_plugin` gate when TRP isn't active yet.
-		$this->filter( 'appress/integrations/registered', '@register_integration' );
-
-		// TRP plugin must be active for any of the rest. Without it the
-		// integration card still shows on the Integrations page but
-		// every downstream controller would fail to read TRP settings.
+		// TRP plugin must be active for anything to wire up. Without it
+		// we skip entirely — the per-app sub-tab + Features toggle hide
+		// themselves automatically because
+		// `Admin_Controller::collect_integration_status` reports
+		// `translatepress.installed = false`.
 		if ( ! class_exists( '\TRP_Translate_Press' ) ) {
 			return;
 		}
 
-		// Always-on: per-app admin UI (toggle + per-app label strings +
-		// cache clear button). Admin needs to configure these BEFORE
-		// flipping the master toggle on, so the controller's render +
-		// save handlers must be wired regardless of master state.
-		// Mirrors the Voxel `Events_Controller` pattern.
+		// Per-app sub-tab → "Clear boot cache" button → AJAX endpoint.
+		// Always-on so admins can invalidate the boot cache during
+		// debugging without flipping every per-app toggle.
 		new Controllers\Settings_Controller();
 
-		// Detail page hook — Integrations\Admin_Controller fires this when
-		// admin visits `?integration=translatepress`. Asset enqueue is
-		// handled separately by Settings_Controller on `admin_enqueue_scripts`.
-		$this->on( 'appress/integrations/admin_template/translatepress', '@render_detail' );
-
-		// Site-level toggle gate. Integrations_Manager fires
-		// `appress/integration/translatepress/execute` only when
-		// `appress_settings.modules.translatepress = true`. Without
-		// this gate, the integration bootstraps as soon as the TRP
-		// plugin class loads — bypassing the admin's master toggle on
-		// the Integrations page. Customer surfaced this exact bug:
-		// they switched the master off but the mobile app boot endpoint
-		// kept emitting variant URLs, so device-locale matching pinned
-		// English users on the en_GB variant instead of falling back
-		// to the site's TRP default. Match the Voxel / WC / Avada
-		// pattern: site-level toggle → bootstrap on execute action.
-		$this->on( 'appress/integration/translatepress/execute', '@bootstrap_integration' );
-	}
-
-	/**
-	 * Boot the integration's user-facing surfaces (boot-config enrichment,
-	 * front-end switcher shortcode, server-side user-language store)
-	 * only when the master toggle is on. Settings UI is always on
-	 * (instantiated in hooks() above) so admin can prep config before
-	 * flipping the master.
-	 */
-	protected function bootstrap_integration() {
+		// Boot enrichment + switcher shortcode + user-language store.
+		// All three are inert at runtime when no app has the per-app
+		// toggle on — `Boot_Config_Controller::build_context` short-
+		// circuits on `$live_config['translatepress']['enabled'] !== true`,
+		// the shortcode returns an empty string when TRP itself has no
+		// extra languages published, and the user-language endpoints
+		// validate the lang code against TRP's published list before
+		// writing. Bootstrapping unconditionally keeps the wiring
+		// simple — the gates live downstream where they belong.
 		new Controllers\Boot_Config_Controller();
 		new Controllers\Shortcode_Controller();
 		new Controllers\User_Language_Controller();
-	}
-
-	protected function register_integration( $integrations ) {
-		$integrations['translatepress'] = [
-			'name'            => __( 'TranslatePress', 'appress' ),
-			'description'     => __( 'Render every screen URL and bottom-nav label in the active language so the app matches your TranslatePress setup with no flicker or redirect.', 'appress' ),
-			'color'           => 'orange',
-			// Dashicon path — Vue Integrations list resolves `dashicons-*`
-			// strings as CSS classes (see Avada_Controller for the full
-			// icon-resolution note). Swap to a logo.svg URL later if a
-			// brand glyph is preferred.
-			'icon'            => APPRESS_PLUGIN_URL . 'app/integration/translatepress/logo.svg',
-			'configurable'    => true,
-			'requires_plugin' => [
-				'name'  => 'TranslatePress – Multilingual',
-				'class' => '\\TRP_Translate_Press',
-			],
-			'integrations'    => [
-				'url_translation'   => __( 'Per-language URL resolution for screens & deeplinks', 'appress' ),
-				'label_translation' => __( 'Per-language bottom-nav labels', 'appress' ),
-				'per_app_toggle'    => __( 'Enable per app, with per-app cache control', 'appress' ),
-			],
-		];
-		return $integrations;
-	}
-
-	public function render_detail() {
-		Controllers\Settings_Controller::render();
 	}
 }

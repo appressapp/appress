@@ -79,6 +79,17 @@ class Frontend_Controller extends Base_Controller
 		// platforms identically.
 		$this->on('wp_head', '@print_analytics_js', 0);
 
+		// Live runtime config — every Settings-tab field that doesn't
+		// need to bake into the binary (subscreen routing rules, smart
+		// prefetch knobs, …). Emitted as a single `window.AppressAppSettings`
+		// inline literal on every page response so deep links + cached
+		// pages all carry a usable config. Native bridge JS reads it on
+		// load and caches the latest snapshot to disk so subsequent cold
+		// starts apply immediately. Priority 1: runs AFTER the page-paint
+		// guards (analytics + ads blocker, priority 0) since this config
+		// isn't consumed by inline page scripts.
+		$this->on('wp_head', '@print_app_settings', 1);
+
 		$this->on('wp_login', '@detect_first_install_on_login', 10, 2);
 
 		// Async dispatcher: scheduled by the detector below; runs in cron so any
@@ -288,6 +299,179 @@ JS;
 		$js = str_replace( '</script', '<\/script', $js );
 
 		echo "<script id=\"appress-analytics\">\n" . $js . "\n</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- values JSON-encoded; admin-only input.
+	}
+
+	/**
+	 * Emit `window.AppressAppSettings` — every Settings-tab runtime
+	 * config the native bridge consumes after the home page (or any
+	 * page) loads inside the app. Single source of truth =
+	 * {@see \Appress\get_app_settings()}; this method just JSON-encodes
+	 * the result and wraps it in a `<script>` so the WebView's bridge
+	 * JS can read it on `DOMContentLoaded` (or earlier via the
+	 * `appressLiveConfigReady` event dispatched right after assignment).
+	 *
+	 * Multi-app safe: `\Appress\get_current_app_id()` resolves the app
+	 * id from the request's UA marker (`Appress/{appId}`), so when two
+	 * Appress apps hit the same WP install they each get THEIR config.
+	 * Page-cache plugins must vary by UA for this to round-trip — same
+	 * constraint already documented for Voxel visibility rules.
+	 *
+	 * No-emit cases:
+	 *   - request isn't from the native app (no UA marker → 0 app id),
+	 *   - app id resolves but `get_app_settings` returns empty (row deleted).
+	 */
+	protected function print_app_settings()
+	{
+		$app_id = \Appress\get_current_app_id();
+		if ( $app_id <= 0 ) {
+			return;
+		}
+
+		// Gate to the app's home URL only. Native fetches the live
+		// config once at cold-start by loading the home page and
+		// reading `window.AppressAppSettings`; once cached to
+		// UserDefaults / SharedPreferences, deep links to other
+		// pages reuse the cached snapshot. Printing the script on
+		// every page response would waste bandwidth (each non-home
+		// hit serves ~1-2KB the native side ignores) and pollute
+		// page-cache plugins that don't vary by Appress UA.
+		if ( ! $this->is_home_url_request( $app_id ) ) {
+			return;
+		}
+
+		$config = \Appress\get_app_settings( $app_id );
+		if ( empty( $config ) ) {
+			return;
+		}
+
+		// JSON_UNESCAPED_UNICODE keeps non-ASCII (Vietnamese path
+		// fragments, Georgian script in excluded paths) readable in
+		// the rendered HTML — the previous `á`-style escapes
+		// would survive but bloat the payload and trip the same
+		// double-unslash class of bug the bottom-nav title pipeline
+		// hit on Central. JSON_UNESCAPED_SLASHES drops the `\/` slash
+		// escaping that's irrelevant inside a `<script>` block.
+		$json = wp_json_encode( $config, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+		if ( ! is_string( $json ) || $json === '' ) {
+			return;
+		}
+
+		// Defensive: any admin-entered `</script` substring (live in a
+		// path-fragment textarea, say) would otherwise break out of
+		// the inline tag. JSON encoder doesn't escape this by default
+		// inside a string context, so do a targeted str_replace
+		// AFTER encoding — same pattern as `print_ads_blocker_js`.
+		$json = str_replace( '</script', '<\/script', $json );
+
+		// The CustomEvent dispatch is the handshake native bridge JS
+		// listens for: bridges injected at `documentStart` fire before
+		// `<head>` parses, so they can't just read `window.AppressAppSettings`
+		// inline. They subscribe to `AppressAppSettingsReady` and read
+		// the (now-assigned) global from the handler.
+		//
+		// Apple 4.3 hardening: every visible token here is either
+		// per-app salted (the `Appress*` identifiers run through the
+		// boundary buffer's HMAC rewrite) or generic enough that no
+		// `appress` substring survives in the rendered HTML. The
+		// `<script>` element gets a salt-prefixed id, and the
+		// CustomEvent name uses the same `AppressAppSettingsReady`
+		// shape so the boundary buffer hashes it identically on both
+		// the PHP emit + the native binary's listener literal.
+		$ids        = \Appress\get_native_class_ids();
+		$script_id  = ( $ids && ! empty( $ids['namespace'] ) ) ? $ids['namespace'] . '-app-settings' : 'app-settings';
+		$script_id  = esc_attr( $script_id );
+		echo "<script id=\"{$script_id}\">\nwindow.AppressAppSettings=" . $json . ";try{window.dispatchEvent(new CustomEvent('AppressAppSettingsReady',{detail:window.AppressAppSettings}));}catch(e){}\n</script>\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-encoded above; admin-only input.
+	}
+
+	/**
+	 * True when the current request matches the app's configured
+	 * Home Screen URL (`build_config.home_screen.url`). Falls back to
+	 * `home_url()` when the admin hasn't picked a Home Screen yet.
+	 *
+	 * Caching:
+	 *   - Static per-request map keeps repeat calls during a single
+	 *     PHP worker free of any lookup at all.
+	 *   - `wp_cache` (object cache; persistent on Memcached / Redis
+	 *     sites, in-memory elsewhere) holds the normalized home path
+	 *     across requests so the DB hit fires at most once per cache
+	 *     TTL. Invalidated explicitly when admin saves the app's
+	 *     config (see `Apps_Controller::save_config` →
+	 *     `Frontend_Controller::clear_home_path_cache`).
+	 *
+	 * Path-only match — query strings, fragments, and trailing
+	 * slashes are normalized away so `/?utm_source=push` deep links
+	 * to home still emit the live config.
+	 */
+	private function is_home_url_request( int $app_id ): bool {
+		static $request_cache = [];
+		if ( ! isset( $request_cache[ $app_id ] ) ) {
+			$request_cache[ $app_id ] = $this->resolve_home_path( $app_id );
+		}
+		$home_path = $request_cache[ $app_id ];
+
+		$current = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '/';
+		return self::normalise_path( $current ) === $home_path;
+	}
+
+	/**
+	 * Resolve the normalized home-screen URL path for an app. Hits
+	 * `wp_cache` first; on miss, runs a single SELECT against the
+	 * indexed PK and writes back. TTL is generous (a day) because the
+	 * cache is explicitly cleared on save by
+	 * `Apps_Controller::save_config`.
+	 */
+	private function resolve_home_path( int $app_id ): string {
+		$cache_key = self::home_path_cache_key( $app_id );
+		$cached    = wp_cache_get( $cache_key, 'appress' );
+		if ( $cached !== false && is_string( $cached ) ) {
+			return $cached;
+		}
+
+		global $wpdb;
+		$raw = $wpdb->get_var(
+			$wpdb->prepare( "SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d", $app_id )
+		);
+		$home_url = home_url( '/' );
+		if ( ! empty( $raw ) ) {
+			$bc = json_decode( $raw, true );
+			if ( is_array( $bc ) && ! empty( $bc['home_screen']['url'] ) ) {
+				$home_url = (string) $bc['home_screen']['url'];
+			}
+		}
+		$path = self::normalise_path( $home_url );
+		wp_cache_set( $cache_key, $path, 'appress', DAY_IN_SECONDS );
+		return $path;
+	}
+
+	/**
+	 * Object-cache key for a single app's resolved home path. Public
+	 * so `Apps_Controller::save_config` can `wp_cache_delete()` it
+	 * without re-implementing the naming scheme.
+	 */
+	public static function home_path_cache_key( int $app_id ): string {
+		return 'home_path_' . $app_id;
+	}
+
+	/**
+	 * Invalidate the cached home path for an app. Called by
+	 * `Apps_Controller::save_config` after any successful write so the
+	 * next request reads the fresh `home_screen.url`.
+	 */
+	public static function clear_home_path_cache( int $app_id ): void {
+		wp_cache_delete( self::home_path_cache_key( $app_id ), 'appress' );
+	}
+
+	/**
+	 * Strip scheme + host + query + fragment from a URL, collapse
+	 * trailing slash. Used by both `resolve_home_path` (cache write)
+	 * and `is_home_url_request` (request match) so the two sides
+	 * always normalize identically.
+	 */
+	private static function normalise_path( string $url ): string {
+		$parts = wp_parse_url( $url );
+		$path  = isset( $parts['path'] ) ? (string) $parts['path'] : '/';
+		$path  = '/' . ltrim( rtrim( $path, '/' ), '/' );
+		return $path === '' ? '/' : $path;
 	}
 
 	protected function detect_first_install_on_login($user_login, $user)

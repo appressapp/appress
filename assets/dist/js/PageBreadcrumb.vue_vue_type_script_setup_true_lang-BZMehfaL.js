@@ -1,1 +1,0 @@
-import{d as t,o as a,c as s,a as o,t as r}from"./commons-D7mAfYxt.js";const n={class:"flex flex-wrap items-center justify-between gap-3 mb-6"},c={class:"text-xl font-semibold text-gray-800 dark:text-white/90","x-text":"pageTitle"},_=t({__name:"PageBreadcrumb",props:{pageTitle:{}},setup(i){return(e,p)=>(a(),s("div",n,[o("h2",c,r(e.pageTitle),1)]))}});export{_};

@@ -7,7 +7,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Database_Controller extends \Appress\Controllers\Base_Controller {
 
-	const DB_VERSION = '1.3.1';
+	const DB_VERSION = '1.4.0';
 
 	protected function hooks() {
 		// Run the schema migration synchronously at controller boot rather
@@ -81,6 +81,7 @@ class Database_Controller extends \Appress\Controllers\Base_Controller {
 			central_app_id bigint(20) unsigned DEFAULT 0,
 			unique_class varchar(20) DEFAULT NULL,
 			build_config longtext,
+			settings longtext,
 			credentials longtext,
 			signing_secret text,
 			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -91,6 +92,62 @@ class Database_Controller extends \Appress\Controllers\Base_Controller {
 		) $charset_collate;";
 
 		dbDelta( $sql );
+
+		// 1.4.0: split `build_config` JSON into two columns — fields the
+		// build engine bakes into the binary stay in `build_config`;
+		// fields the WP-side distributes LIVE on every request (Custom
+		// CSS, Analytics, Web Ads, Smart Prefetch, Subscreen routing
+		// rules) move to a new `settings` column. With the storage layer
+		// enforcing the split, `request_build` reads `build_config`
+		// directly (no more `unset()` to scrub live fields) and
+		// `Frontend_Controller::print_*` printers read `settings`
+		// without having to filter a co-mingled blob. Admin saves on
+		// the Settings tab no longer bump `update_time_hash` either,
+		// so the host preview app stops treating Settings edits as a
+		// rebuild signal. Idempotent (version-guard short-circuit).
+		if ( get_option( 'appress_db_app_version' ) !== self::DB_VERSION ) {
+			$settings_keys = [
+				'css_all', 'css_android', 'css_ios',
+				'disable_web_ads', 'disable_web_ads_platforms', 'disable_web_ads_custom_hosts',
+				'google_analytics_id', 'exclude_all_web_ga', 'exclude_web_ga_ids',
+				'prefetch_cache_duration', 'prefetch_cache_exclude_paths',
+				'inline_link_selectors', 'subscreen_url_patterns',
+			];
+			$migrate_rows = $wpdb->get_results( "SELECT id, build_config, settings FROM $apps_table", ARRAY_A );
+			foreach ( (array) $migrate_rows as $row ) {
+				$build = json_decode( (string) ( $row['build_config'] ?? '' ), true );
+				if ( ! is_array( $build ) ) $build = [];
+				$settings_existing = json_decode( (string) ( $row['settings'] ?? '' ), true );
+				if ( ! is_array( $settings_existing ) ) $settings_existing = [];
+
+				$lifted = [];
+				$touched = false;
+				foreach ( $settings_keys as $key ) {
+					if ( array_key_exists( $key, $build ) ) {
+						$lifted[ $key ] = $build[ $key ];
+						unset( $build[ $key ] );
+						$touched = true;
+					}
+				}
+				if ( ! $touched && empty( $settings_existing ) ) continue;
+
+				// Existing `settings` column entries win on key
+				// collision — if the admin saved between schema split
+				// + this migration running, those writes already
+				// landed in `settings` with the new code path; the
+				// build_config row's stale copy must NOT clobber them.
+				$merged_settings = array_merge( $lifted, $settings_existing );
+
+				$wpdb->update(
+					$apps_table,
+					[
+						'build_config' => wp_json_encode( $build ),
+						'settings'     => wp_json_encode( $merged_settings ),
+					],
+					[ 'id' => (int) $row['id'] ]
+				);
+			}
+		}
 
 		// 1.3.0 collapses the historical `live_config` column into
 		// `build_config`. Customer mobile apps boot from baked config and

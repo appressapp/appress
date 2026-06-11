@@ -31,7 +31,6 @@ return [
 		'apps.js',
 		'integrations.js',
 		'integration-events-panel.js',
-		'integration-translatepress.js',
 		'broadcast.js',
 		'settings.js',
 	],

@@ -319,9 +319,17 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
 
     /**
      * Read + cache (per-request) the prefetch cache settings for
-     * this app. Static cache means the DB query for `live_config`
-     * hits once regardless of how many sub-resource requests share
-     * the PHP worker.
+     * this app. Static cache means the DB query hits at most once
+     * per PHP worker regardless of how many sub-resource requests
+     * share it.
+     *
+     * 1.4.0 — reads from the dedicated `settings` column (Smart
+     * Prefetch fields migrated out of `build_config` as part of the
+     * baked-vs-live storage split). The header override is pure
+     * server-side: this hook runs on `send_headers` and never
+     * touches the native binary; native consumes the cached pages
+     * over HTTP once the relaxed `Cache-Control` lands on the WP
+     * response.
      *
      * @return array{duration:int, excludes:string[]}
      */
@@ -335,19 +343,19 @@ class Injection_Controller extends \Appress\Controllers\Base_Controller
         global $wpdb;
         $raw = $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+                "SELECT settings FROM {$wpdb->prefix}appress_apps WHERE id = %d",
                 $app_id
             )
         );
-        $live = $raw ? json_decode($raw, true) : [];
-        if (!is_array($live)) {
-            $live = [];
+        $settings = $raw ? json_decode($raw, true) : [];
+        if (!is_array($settings)) {
+            $settings = [];
         }
 
-        $duration = isset($live['prefetch_cache_duration']) ? (int) $live['prefetch_cache_duration'] : 0;
+        $duration = isset($settings['prefetch_cache_duration']) ? (int) $settings['prefetch_cache_duration'] : 0;
         $excludes = [];
-        if (!empty($live['prefetch_cache_exclude_paths']) && is_string($live['prefetch_cache_exclude_paths'])) {
-            foreach (preg_split('/\r\n|\r|\n/', $live['prefetch_cache_exclude_paths']) as $line) {
+        if (!empty($settings['prefetch_cache_exclude_paths']) && is_string($settings['prefetch_cache_exclude_paths'])) {
+            foreach (preg_split('/\r\n|\r|\n/', $settings['prefetch_cache_exclude_paths']) as $line) {
                 $line = trim($line);
                 if ($line !== '') {
                     $excludes[] = $line;

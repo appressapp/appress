@@ -215,7 +215,7 @@ function get_inline_link_selectors( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT settings FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$live = $raw ? json_decode( $raw, true ) : [];
@@ -278,7 +278,7 @@ function get_subscreen_url_patterns( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT settings FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$live = $raw ? json_decode( $raw, true ) : [];
@@ -311,6 +311,95 @@ function get_subscreen_url_patterns( $app_id = 0 ) {
 }
 
 /**
+ * Aggregate every runtime-tunable setting for a single app into one
+ * structured payload the WP frontend emits as `window.AppressAppSettings`
+ * in `wp_head`. The mobile app's bridge JS reads the object on the
+ * first home-page load and caches it on disk so subsequent cold-starts
+ * apply the latest admin rules without rebuilding the binary.
+ *
+ * Scope — Settings-tab fields that LIVE on the WP side, printed into
+ * `wp_head` so admin edits apply on the next page load (no rebuild
+ * required). Phase 2 will wire the native binary to read this object
+ * via a bridge JS at documentStart so customer apps consume the same
+ * payload — replacing the legacy "bake everything into the binary"
+ * path for these specific fields.
+ *
+ * Currently included:
+ *   - `subscreen.inline_link_selectors` — CSS selectors whose `<a>`
+ *     clicks should stay on the current screen instead of pushing a
+ *     subscreen modal.
+ *   - `subscreen.url_patterns` — URL globs that force a subscreen push
+ *     even when navigation arrives via JS / pushState (no real `<a>`
+ *     click for native to intercept).
+ *   - `prefetch.cache_duration` — Cache-Control relax window for
+ *     viewport-warmed pages.
+ *   - `prefetch.exclude_paths` — Path fragments excluded from the
+ *     prefetch cache.
+ *
+ * Build Config tab fields stay BAKED — bottom nav, side menus, first
+ * launch, auth gate, splash, home URL, native feature toggles. Those
+ * gate cold-start UX and can't tolerate a fetch round-trip.
+ *
+ * Output shape is stable + versioned (`v: 1`) so native parsers can
+ * detect breaking changes via the version field instead of probing
+ * for keys. Any future Settings-tab field that crosses the
+ * baked → live boundary slots in here.
+ */
+function get_app_settings( $app_id = 0 ) {
+	$app_id = (int) $app_id;
+	if ( $app_id <= 0 ) {
+		return [];
+	}
+
+	global $wpdb;
+	$row = $wpdb->get_row(
+		$wpdb->prepare( "SELECT settings FROM {$wpdb->prefix}appress_apps WHERE id = %d", $app_id ),
+		ARRAY_A
+	);
+	if ( empty( $row ) ) {
+		return [];
+	}
+
+	$live = ! empty( $row['settings'] ) ? json_decode( $row['settings'], true ) : [];
+	if ( ! is_array( $live ) ) {
+		$live = [];
+	}
+
+	$prefetch_duration = isset( $live['prefetch_cache_duration'] ) ? (int) $live['prefetch_cache_duration'] : 300;
+	$prefetch_excludes_raw = isset( $live['prefetch_cache_exclude_paths'] ) ? (string) $live['prefetch_cache_exclude_paths'] : '';
+	$prefetch_excludes = array_values( array_filter( array_map( 'trim', preg_split( "/\r\n|\r|\n/", $prefetch_excludes_raw ) ) ) );
+
+	return [
+		'v'      => 1,
+		'app_id' => $app_id,
+		'subscreen' => [
+			// Same filter pipeline integration plugins (Voxel, WooCommerce, …)
+			// already hook into — single source of truth for both the live
+			// emit + the baked payload's pre-bake snapshot.
+			'inline_link_selectors' => get_inline_link_selectors( $app_id ),
+			'url_patterns'          => get_subscreen_url_patterns( $app_id ),
+		],
+		'prefetch' => [
+			'cache_duration' => $prefetch_duration,
+			'exclude_paths'  => $prefetch_excludes,
+		],
+		'dark_mode_options' => [
+			// Admin types these in `Settings → Dark Mode` to match
+			// whichever WordPress dark-mode plugin (or custom theme
+			// CSS) they want the app to drive. The slave-injected
+			// bridge JS reads these on every viewport-prefetch + cold
+			// page load and applies the class / storage marker when
+			// the device is in dark mode. Empty values short-circuit
+			// the bridge — useful when admin temporarily switched
+			// dark-mode plugins without removing the toggle.
+			'body_class'         => (string) ( $live['dark_mode_options']['body_class']         ?? '' ),
+			'localstorage_key'   => (string) ( $live['dark_mode_options']['localstorage_key']   ?? '' ),
+			'localstorage_value' => (string) ( $live['dark_mode_options']['localstorage_value'] ?? 'true' ),
+		],
+	];
+}
+
+/**
  * App CSS (admin textareas + integration filter) for the boot payload.
  * Same pipeline as {@see get_inline_link_selectors}: read admin
  * `live_config.css_all` / `css_android` / `css_ios`, run each through
@@ -336,7 +425,7 @@ function get_app_css( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT settings FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$live = $raw ? json_decode( $raw, true ) : [];
@@ -410,7 +499,7 @@ function get_disable_web_ads_hosts( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT settings FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$cfg = $raw ? json_decode( $raw, true ) : [];
@@ -527,7 +616,7 @@ function get_analytics_config( $app_id = 0 ) {
 
 	global $wpdb;
 	$raw = $wpdb->get_var( $wpdb->prepare(
-		"SELECT build_config FROM {$wpdb->prefix}appress_apps WHERE id = %d",
+		"SELECT settings FROM {$wpdb->prefix}appress_apps WHERE id = %d",
 		$app_id
 	) );
 	$cfg = $raw ? json_decode( $raw, true ) : [];

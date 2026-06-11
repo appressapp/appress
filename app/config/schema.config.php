@@ -17,16 +17,22 @@ return [
 				'required' => true,
 				'ui' => [ 'group' => 'app_info', 'placeholder' => __( 'E.g. My Awesome App', 'appress' ) ]
 			],
+			// Auto-detected from `home_url()` in the save handler — never
+			// rendered as an admin-editable input (SingleAppView.vue skips
+			// the `url` row in the app_info field loop). Kept in the
+			// schema for storage shape consistency: native + build engine
+			// keep reading `build_config.url` as the website root, so
+			// hiding the field doesn't require touching downstream
+			// consumers. `required` dropped since the admin can't type it.
 			'url' => [
 				'type' => 'url',
 				'label' => __( 'Website URL', 'appress' ),
 				'sanitize' => 'url',
 				'default' => '',
-				'required' => true,
 				'ui' => [
 					'group' => 'app_info',
 					'placeholder' => 'https://example.com',
-					'hint' => __( 'Root URL of your website.', 'appress' )
+					'hint' => __( 'Root URL of your website (auto-detected).', 'appress' )
 				]
 			],
 			'logo' => [
@@ -74,7 +80,20 @@ return [
 				'required' => true,
 				'ui' => [
 					'group' => 'splash_screen',
-					'hint' => __( 'Behind the logo in Default mode. In Custom Image mode, match this to your image\'s edge color to avoid a color flash while the app launches.', 'appress' ),
+					// Only Default mode renders the logo on a bg color. In
+					// Custom Image mode the engine strips
+					// `APPRESS-SPLASH-DEFAULT` blocks entirely and the
+					// remaining IMAGE block hardcodes a black backdrop the
+					// image's `CENTER_CROP` immediately covers — admin's
+					// chosen color would never paint a single visible
+					// pixel.
+					'show_if' => 'splash_type=default',
+					'hint' => __( 'Behind the logo while the app boots.', 'appress' ),
+					// Native splash code reads this value at boot, before any
+					// page paints — there's no DOM / `:root` to resolve a CSS
+					// variable against. Force a plain hex string by hiding the
+					// CSS-var toggle in `ColorInput`.
+					'enable_css_var' => false,
 				]
 			],
 			'splash_show_loading_bar' => [
@@ -84,6 +103,10 @@ return [
 				'default' => true,
 				'ui' => [
 					'group' => 'splash_screen',
+					// Loading pill is part of the Default block; the IMAGE
+					// block renders nothing but the full-bleed image and
+					// has no progress affordance to toggle.
+					'show_if' => 'splash_type=default',
 					'hint' => __( 'Animated progress pill displayed under the logo while the app boots.', 'appress' ),
 				]
 			],
@@ -94,9 +117,56 @@ return [
 				'default' => '',
 				'ui' => [
 					'group' => 'splash_screen',
+					// Only used by Custom Image mode — Default mode never
+					// downloads or references this asset (engine
+					// short-circuits `02-logo-processor` when
+					// `splash_type !== 'image'`).
+					'show_if' => 'splash_type=image',
 					'hint' => __( 'Portrait image recommended. Use a high resolution (at least 1290×2796) so it stays crisp on large phones. The image is center-cropped to fit each device screen.', 'appress' )
 				]
 			],
+			// ── Home Screen ──────────────────────────────────────────────
+			// The URL native loads as the default screen when the app
+			// opens. `type` is a UX switch — `url` for free-text input,
+			// any other value (post-type slug like `page`, `product`,
+			// `appress_screen`, or `any`) for the Content Source picker
+			// that fetches matching posts from `posts.search`. Native
+			// consumes only `url`, so the picker choice doesn't change
+			// the stored shape.
+			'home_screen' => [
+				'type' => 'object',
+				'label' => __( 'Home Screen', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [],
+				'fields' => [
+					'type' => [
+						// `select` with `sanitize: text` — Vue builds the
+						// dropdown options dynamically from
+						// `Apppress_Config.post_types` (every public CPT)
+						// plus the `url` static entry. Schema `options`
+						// stays empty since the list is runtime-determined.
+						'type' => 'select',
+						'label' => __( 'Content Source', 'appress' ),
+						'sanitize' => 'text',
+						'default' => 'page',
+						'ui' => [
+							'group' => 'home_screen',
+							'hint' => __( 'Pick a Page / Post / Appress Screen / any post type — or enter a custom URL.', 'appress' ),
+						]
+					],
+					'url' => [
+						'type' => 'url',
+						'label' => __( 'URL', 'appress' ),
+						'sanitize' => 'url',
+						'default' => '',
+						'ui' => [
+							'group' => 'home_screen',
+							'placeholder' => 'https://example.com/'
+						]
+					],
+				]
+			],
+
 			'sha1_fingerprint' => [
 				'type' => 'text',
 				'label' => __( 'SHA-1 Certificate Fingerprint', 'appress' ),
@@ -215,11 +285,12 @@ return [
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Enable Push Notifications', 'appress' ),
+						'label' => __( 'Push Notifications', 'appress' ),
 						'sanitize' => 'boolean',
 						'default' => true,
 						'ui' => [
 							'group' => 'native_features',
+							'tier'  => 'basic',
 							'doc_url' => 'https://docs.appress.app/native-features/push-notifications'
 						]
 					],
@@ -230,15 +301,16 @@ return [
 				'type' => 'object',
 				'label' => __( 'Biometric Authentication', 'appress' ),
 				'sanitize' => 'object',
-				'default' => [ 'enabled' => true ],
+				'default' => [ 'enabled' => false ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Enable Biometric (Face ID / Touch ID)', 'appress' ),
+						'label' => __( 'Biometric (Face ID / Touch ID)', 'appress' ),
 						'sanitize' => 'boolean',
-						'default' => true,
+						'default' => false,
 						'ui' => [
 							'group' => 'native_features',
+							'tier'  => 'advanced',
 							'doc_url' => 'https://docs.appress.app/native-features/biometric'
 						]
 					],
@@ -249,15 +321,16 @@ return [
 				'type' => 'object',
 				'label' => __( 'Google Sign-In', 'appress' ),
 				'sanitize' => 'object',
-				'default' => [ 'enabled' => true ],
+				'default' => [ 'enabled' => false ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Enable Google Sign-In', 'appress' ),
+						'label' => __( 'Google Sign-In', 'appress' ),
 						'sanitize' => 'boolean',
-						'default' => true,
+						'default' => false,
 						'ui' => [
 							'group' => 'native_features',
+							'tier'  => 'advanced',
 							'doc_url' => 'https://docs.appress.app/native-features/google-sign-in'
 						]
 					],
@@ -268,15 +341,16 @@ return [
 				'type' => 'object',
 				'label' => __( 'Sign in with Apple', 'appress' ),
 				'sanitize' => 'object',
-				'default' => [ 'enabled' => true ],
+				'default' => [ 'enabled' => false ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Enable Sign in with Apple', 'appress' ),
+						'label' => __( 'Sign in with Apple', 'appress' ),
 						'sanitize' => 'boolean',
-						'default' => true,
+						'default' => false,
 						'ui' => [
 							'group' => 'native_features',
+							'tier'  => 'advanced',
 							'doc_url' => 'https://docs.appress.app/native-features/sign-in-with-apple'
 						]
 					],
@@ -287,15 +361,16 @@ return [
 				'type' => 'object',
 				'label' => __( 'QR Code Scanner', 'appress' ),
 				'sanitize' => 'object',
-				'default' => [ 'enabled' => true ],
+				'default' => [ 'enabled' => false ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Enable QR Scanner', 'appress' ),
+						'label' => __( 'QR Scanner', 'appress' ),
 						'sanitize' => 'boolean',
-						'default' => true,
+						'default' => false,
 						'ui' => [
 							'group' => 'native_features',
+							'tier'  => 'advanced',
 							'doc_url' => 'https://docs.appress.app/native-features/qr-scanner'
 						]
 					],
@@ -310,11 +385,12 @@ return [
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Enable Geolocation', 'appress' ),
+						'label' => __( 'Geolocation', 'appress' ),
 						'sanitize' => 'boolean',
 						'default' => true,
 						'ui' => [
 							'group' => 'native_features',
+							'tier'  => 'basic',
 							'doc_url' => 'https://docs.appress.app/native-features/geolocation'
 						]
 					],
@@ -343,6 +419,7 @@ return [
 						'default' => true,
 						'ui' => [
 							'group' => 'native_features',
+							'tier'  => 'basic',
 							'doc_url' => 'https://docs.appress.app/native-features/subscreen'
 						]
 					],
@@ -353,17 +430,41 @@ return [
 				'type' => 'object',
 				'label' => __( 'TranslatePress', 'appress' ),
 				'sanitize' => 'object',
-				'default' => [ 'enabled' => false ],
+				'default' => [ 'enabled' => false, 'strings' => [] ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Enable TranslatePress', 'appress' ),
+						'label' => __( 'TranslatePress', 'appress' ),
 						'sanitize' => 'boolean',
 						'default' => false,
 						'ui' => [
-							'group' => 'native_features',
-							'doc_url' => 'https://docs.appress.app/integrations/translatepress'
+							// Native Features toggle. Visibility further
+							// gated client-side on `hasTranslatePress` (the
+							// plugin is installed + active) — see the Vue
+							// `getNativeFeatureToggles` filter. Hide rather
+							// than disable to keep the Features grid clean
+							// for sites that haven't installed TRP yet.
+							'group'              => 'native_features',
+							'tier'               => 'advanced',
+							'requires_plugin'    => 'translatepress',
+							'doc_url'            => 'https://docs.appress.app/integrations/translatepress'
 						]
+					],
+					// Per-app bottom-nav label translations keyed by
+					// `{tab_id}.{lang_code}`. Native bakes this dict at
+					// build time and looks up the active language's value
+					// at runtime for each tab. Stored alongside the rest
+					// of the app's build_config — single source of truth,
+					// replaces the old per-app `appress_trp_integration_<id>`
+					// option that lived on the standalone /appress-integrations
+					// detail page. `dict` is the sanitizer for runtime-keyed
+					// nested maps (see `Apps_Controller::sanitize_dict_recursive`);
+					// `object` would require pre-declared `fields` which
+					// can't enumerate dynamic tab ids.
+					'strings' => [
+						'type'     => 'dict',
+						'sanitize' => 'dict',
+						'default'  => [],
 					],
 				]
 			],
@@ -384,28 +485,7 @@ return [
 			//   prefetch + inline-link / subscreen URL patterns.
 			// ============================================================
 
-			// ── Custom CSS injected into every WebView ───────────────────
-			'css_all' => [
-				'type' => 'textarea',
-				'label' => __( 'Custom CSS (Global)', 'appress' ),
-				'sanitize' => 'css',
-				'default' => '',
-				'ui' => [ 'group' => 'custom_css', 'placeholder' => '.site-header { display: none; }', 'col_span' => 2 ]
-			],
-			'css_android' => [
-				'type' => 'textarea',
-				'label' => __( 'Custom CSS (Android)', 'appress' ),
-				'sanitize' => 'css',
-				'default' => '',
-				'ui' => [ 'group' => 'custom_css', 'placeholder' => '/* Android specific */' ]
-			],
-			'css_ios' => [
-				'type' => 'textarea',
-				'label' => __( 'Custom CSS (iOS)', 'appress' ),
-				'sanitize' => 'css',
-				'default' => '',
-				'ui' => [ 'group' => 'custom_css', 'placeholder' => '/* iOS specific */' ]
-			],
+			// (Custom CSS fields moved to top-level `settings` category — printed live via wp_head.)
 
 			// ── Bottom Navigation ────────────────────────────────────────
 			'bottom_navigation' => [
@@ -414,15 +494,33 @@ return [
 				'sanitize' => 'object',
 				'default' => [],
 				'fields' => [
-					'enabled' => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true ],
+					// Surfaced as a Native Features toggle so it sits with
+					// other build-time feature gates. Toggling OFF strips
+					// AppressBottomNavView from the binary (mutator FEATURE_KEYS).
+					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Bottom Navigation', 'appress' ), 'sanitize' => 'boolean', 'default' => true, 'ui' => [ 'group' => 'native_features', 'tier' => 'basic' ] ],
 					// Toggles
 					'hide_on_scroll' => [ 'type' => 'boolean', 'label' => __( 'Hide on Scroll', 'appress' ), 'sanitize' => 'boolean', 'default' => true, 'ui' => [ 'group' => 'nav_toggles' ] ],
 					'active_item_top_border' => [ 'type' => 'boolean', 'label' => __( 'Active item top border', 'appress' ), 'sanitize' => 'boolean', 'default' => true, 'ui' => [ 'group' => 'nav_toggles' ] ],
 					'show_on_subscreen' => [ 'type' => 'boolean', 'label' => __( 'Show on subscreen', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'nav_toggles', 'hint' => __( 'Keep the bottom nav visible when a subscreen is pushed on top of a tab.', 'appress' ), 'show_if' => 'subscreen.enabled' ] ],
-					// Colors
+					// Colors — light/default mode.
 					'background_color' => [ 'type' => 'color', 'label' => __( 'Background Color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'nav_colors' ] ],
 					'active_color' => [ 'type' => 'color', 'label' => __( 'Active Color', 'appress' ), 'sanitize' => 'text', 'default' => '#000000', 'ui' => [ 'group' => 'nav_colors' ] ],
 					'normal_color' => [ 'type' => 'color', 'label' => __( 'Normal Color', 'appress' ), 'sanitize' => 'text', 'default' => '#9ca3af', 'ui' => [ 'group' => 'nav_colors' ] ],
+					// Dark-mode variants — rendered in a SEPARATE
+					// `Dark Mode` section inside the Bottom Navigation
+					// `Styles` card; the section itself is gated by
+					// `dark_mode.enabled` so admins only see these
+					// fields once Auto Dark Mode is toggled on in
+					// Native Features. Native code (iOS dynamic
+					// `UIColor`, Android `applyColors` reapply) swaps
+					// runtime values on every OS appearance flip.
+					// Empty values fall through to the light hex
+					// above so partial setups still render coherently.
+					'background_color_dark'         => [ 'type' => 'color', 'label' => __( 'Background Color', 'appress' ), 'sanitize' => 'text', 'default' => '#111827', 'ui' => [ 'group' => 'nav_dark_colors' ] ],
+					'active_color_dark'             => [ 'type' => 'color', 'label' => __( 'Active Color', 'appress' ),    'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'nav_dark_colors' ] ],
+					'normal_color_dark'             => [ 'type' => 'color', 'label' => __( 'Normal Color', 'appress' ),    'sanitize' => 'text', 'default' => '#6b7280', 'ui' => [ 'group' => 'nav_dark_colors' ] ],
+					'indicator_background_color_dark' => [ 'type' => 'color', 'label' => __( 'Indicator Background', 'appress' ), 'sanitize' => 'text', 'default' => '#ef4444', 'ui' => [ 'group' => 'nav_dark_colors' ] ],
+					'indicator_color_dark'          => [ 'type' => 'color', 'label' => __( 'Indicator Color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'nav_dark_colors' ] ],
 					// Typography
 					'font_family' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'Inter, sans-serif' ],
 					'font_size' => [ 'type' => 'number', 'label' => __( 'Font Size', 'appress' ), 'sanitize' => 'number', 'default' => 12, 'ui' => [ 'group' => 'nav_typography' ] ],
@@ -461,10 +559,36 @@ return [
 							'_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 							'title' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 							'icon' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
-							'type' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'screen' ],
+							// `type` carries the picker mode: `custom_url`,
+							// `menu_toggle`, or any public post type slug
+							// (`page`, `post`, `product`, `appress_screen`,
+							// `any`, …). `BottomNavigationSettings.vue` builds
+							// the Action Type dropdown from `Apppress_Config.post_types`
+							// + the two static specials. `screen_id` is
+							// legacy storage from the pre-PostSearchPicker
+							// shape — kept for backward-compat with rows
+							// saved before; current saves leave it empty
+							// (final URL lives on `url`).
+							'type' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'page' ],
 							'screen_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
 							'url' => [ 'type' => 'url', 'sanitize' => 'url', 'default' => '' ],
 							'menu_target' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'left' ],
+							// Per-item behaviour toggles. `enabled=false`
+							// keeps the item's config but excludes it
+							// from the build (engine filters in
+							// `01-pre-config.js` → bottom-nav array passed
+							// to injectors only has enabled items, so the
+							// disabled tab never lands in
+							// `AppressBakedConfig`). `preload=true` makes
+							// the router eager-load the tab's WebView at
+							// bootstrap so a later tap paints from cache.
+							// `pull_to_refresh=true` enables the gesture
+							// on this tab's screen — native consumers
+							// (`AppressConfigService.isScreenPullToRefresh`)
+							// read it via the standard screenData lookup.
+							'enabled'         => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true ],
+							'preload'         => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false ],
+							'pull_to_refresh' => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true ],
 							'indicator' => [ 'type' => 'select', 'sanitize' => 'text', 'default' => 'none' ],
 							'custom_indicator_style'     => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false ],
 							'indicator_background_color' => [ 'type' => 'color', 'sanitize' => 'text', 'default' => '' ],
@@ -475,13 +599,11 @@ return [
 			],
 
 			// ── Default Configuration (toggles first, then colors) ───────
-			'pull_to_refresh' => [
-				'type' => 'boolean',
-				'label' => __( 'Pull to Refresh', 'appress' ),
-				'sanitize' => 'boolean',
-				'default' => true,
-				'ui' => [ 'group' => 'default_config' ]
-			],
+			// `pull_to_refresh` moved to per-item bottom-nav config —
+			// admin overrides per tab, no global default any more. The
+			// native fallback chain (`AppressConfigService.isScreenPullToRefresh`
+			// → screenData → static `true`) keeps existing baked
+			// binaries that still ship the field harmless.
 			'allow_rotation' => [
 				'type' => 'boolean',
 				'label' => __( 'Allow Rotation', 'appress' ),
@@ -502,7 +624,10 @@ return [
 				'sanitize' => 'text',
 				'default' => '',
 				'ui' => [
-					'group' => 'default_config',
+					'group' => 'splash_screen',
+					// Footer renders under the logo in Default mode; the
+					// IMAGE block has no footer slot to write into.
+					'show_if' => 'splash_type=default',
 					'placeholder' => __( 'e.g. © 2026 Brand Name', 'appress' ),
 					'maxlength' => 80,
 				]
@@ -515,9 +640,45 @@ return [
 				'sanitize' => 'object',
 				'default' => [],
 				'fields' => [
-					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Enable Left Side Menu', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'hint' => __( 'Drawer content comes from the App Screen marked with the "Left Menu Screen" role. Set the role on that screen below.', 'appress' ) ] ],
+					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Left Side Menu', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [
+						// Native Features toggle — strips left-drawer code from
+						// the binary when off (mutator's `side_drawers` composite
+						// strips shared drawer infrastructure only when BOTH
+						// side_menu and right_menu are off).
+						'group' => 'native_features',
+						'tier'  => 'advanced'
+					] ],
+					'type' => [
+						'type' => 'select',
+						'label' => __( 'Content Source', 'appress' ),
+						'sanitize' => 'text',
+						// `page` (most common picked CPT) is the safe
+						// runtime default — was `screen` (legacy
+						// appress_screen-only pick); Vue's dropdown will
+						// fall through to "Custom URL" when the admin
+						// hasn't touched the field.
+						'default' => 'page',
+						'ui' => [
+							'group' => 'side_menu_main',
+							'show_if' => 'enabled',
+							// Options are runtime-built by Vue from
+							// `Apppress_Config.post_types` (every public CPT)
+							// + the `Custom URL` static entry + `All`. Schema
+							// `options` would just be stale documentation here
+							// — see `SingleAppView.vue`'s `contentSourceOptions`
+							// computed for the canonical list.
+							'hint' => __( 'Pick a Page / Post / any public post type — or enter a custom URL.', 'appress' )
+						]
+					],
+					// Single source of truth — picker / text-input both write here.
+					'url' => [ 'type' => 'url', 'label' => __( 'URL', 'appress' ), 'sanitize' => 'url', 'default' => '', 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'placeholder' => 'https://example.com/menu', 'show_if' => 'enabled' ] ],
 					'width_percent' => [ 'type' => 'number', 'label' => __( 'Width (% of screen)', 'appress' ), 'sanitize' => 'number', 'default' => 90, 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'placeholder' => '90', 'show_if' => 'enabled' ] ],
-					'background_color' => [ 'type' => 'color', 'label' => __( 'Background color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'side_menu_main', 'col_span' => 2, 'show_if' => 'enabled' ] ],
+					// `background_color` field removed — the menu drawer is
+					// entirely covered by its hosted WebView, so the wrapper
+					// background only ever flashes for a single pre-paint
+					// frame and is masked by the loaded page's own
+					// `<body>` styling immediately after. Admin had no
+					// observable way to use it.
 				]
 			],
 
@@ -528,9 +689,36 @@ return [
 				'sanitize' => 'object',
 				'default' => [],
 				'fields' => [
-					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Enable Right Side Menu', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'right_menu_main', 'col_span' => 2, 'hint' => __( 'Drawer content comes from the App Screen marked with the "Right Menu Screen" role. Set the role on that screen below.', 'appress' ) ] ],
+					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Right Side Menu', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [
+						// Native Features toggle (mirrors Left Side Menu).
+						'group' => 'native_features',
+						'tier'  => 'advanced'
+					] ],
+					'type' => [
+						'type' => 'select',
+						'label' => __( 'Content Source', 'appress' ),
+						'sanitize' => 'text',
+						// `page` (most common picked CPT) is the safe
+						// runtime default — was `screen` (legacy
+						// appress_screen-only pick); Vue's dropdown will
+						// fall through to "Custom URL" when the admin
+						// hasn't touched the field.
+						'default' => 'page',
+						'ui' => [
+							'group' => 'right_menu_main',
+							'show_if' => 'enabled',
+							// Options are runtime-built by Vue from
+							// `Apppress_Config.post_types` (every public CPT)
+							// + the `Custom URL` static entry + `All`. Schema
+							// `options` would just be stale documentation here
+							// — see `SingleAppView.vue`'s `contentSourceOptions`
+							// computed for the canonical list.
+							'hint' => __( 'Pick a Page / Post / any public post type — or enter a custom URL.', 'appress' )
+						]
+					],
+					'url' => [ 'type' => 'url', 'label' => __( 'URL', 'appress' ), 'sanitize' => 'url', 'default' => '', 'ui' => [ 'group' => 'right_menu_main', 'col_span' => 2, 'placeholder' => 'https://example.com/menu', 'show_if' => 'enabled' ] ],
 					'width_percent' => [ 'type' => 'number', 'label' => __( 'Width (% of screen)', 'appress' ), 'sanitize' => 'number', 'default' => 90, 'ui' => [ 'group' => 'right_menu_main', 'col_span' => 2, 'placeholder' => '90', 'show_if' => 'enabled' ] ],
-					'background_color' => [ 'type' => 'color', 'label' => __( 'Background color', 'appress' ), 'sanitize' => 'text', 'default' => '#ffffff', 'ui' => [ 'group' => 'right_menu_main', 'col_span' => 2, 'show_if' => 'enabled' ] ],
+					// `background_color` removed (mirror of left side menu).
 				]
 			],
 
@@ -541,118 +729,190 @@ return [
 				'sanitize' => 'object',
 				'default' => [],
 				'fields' => [
-					'enabled' => [ 'type' => 'boolean', 'label' => __( 'Enable First Launch Screen', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [ 'group' => 'first_launch_main', 'col_span' => 2 ] ],
+					'enabled' => [ 'type' => 'boolean', 'label' => __( 'First Launch Screen', 'appress' ), 'sanitize' => 'boolean', 'default' => false, 'ui' => [
+						// Surfaced in the Native Features card so it sits with
+						// other build-time toggles. Toggling OFF strips
+						// `AppressFirstLaunchService` from the binary via the
+						// mutator's FEATURE_KEYS gate.
+						'group' => 'native_features',
+						'tier'  => 'advanced'
+					] ],
 					'type' => [
 						'type' => 'select',
 						'label' => __( 'Content Source', 'appress' ),
 						'sanitize' => 'text',
-						'default' => 'screen',
+						// `page` (most common picked CPT) is the safe
+						// runtime default — was `screen` (legacy
+						// appress_screen-only pick); Vue's dropdown will
+						// fall through to "Custom URL" when the admin
+						// hasn't touched the field.
+						'default' => 'page',
 						'ui' => [
 							'group' => 'first_launch_main',
 							'show_if' => 'enabled',
-							'hint' => __( 'Load an external URL, or point to an existing App Screen so the launch page reuses its URL.', 'appress' ),
-							'options' => [
-								[ 'value' => 'url',    'label' => 'Custom URL' ],
-								[ 'value' => 'screen', 'label' => 'App Screen' ],
-							]
+							// Options are runtime-built by Vue from
+							// `Apppress_Config.post_types` (every public CPT)
+							// + the `Custom URL` static entry + `All`. Schema
+							// `options` would just be stale documentation here
+							// — see `SingleAppView.vue`'s `contentSourceOptions`
+							// computed for the canonical list.
+							'hint' => __( 'Pick a Page / Post / any public post type — or enter a custom URL.', 'appress' )
 						]
 					],
-					'url' => [ 'type' => 'url', 'label' => __( 'URL', 'appress' ), 'sanitize' => 'url', 'default' => '', 'ui' => [ 'group' => 'first_launch_main', 'placeholder' => 'https://example.com/welcome', 'show_if' => 'enabled && type=url' ] ],
-					'screen_id' => [ 'type' => 'text', 'label' => __( 'Linked App Screen', 'appress' ), 'sanitize' => 'text', 'default' => '', 'ui' => [ 'group' => 'first_launch_main', 'show_if' => 'enabled && type=screen' ] ],
+					// Single source of truth. The `type` selector above is
+					// purely a UX switch: `type=screen` shows a CPT picker
+					// that fills this field; `type=url` shows a free-text
+					// input bound to this field. Native consumes only `url`.
+					'url' => [ 'type' => 'url', 'label' => __( 'URL', 'appress' ), 'sanitize' => 'url', 'default' => '', 'ui' => [ 'group' => 'first_launch_main', 'placeholder' => 'https://example.com/welcome', 'show_if' => 'enabled' ] ],
 				]
 			],
 
 			// ── Auth Gate ────────────────────────────────────────────────
 			'require_auth_to_open' => [
 				'type' => 'boolean',
-				'label' => __( 'Require authentication to open the app', 'appress' ),
+				'label' => __( 'Authentication Gate', 'appress' ),
 				'sanitize' => 'boolean',
 				'default' => false,
 				'ui' => [
-					'group' => 'require_auth',
-					'col_span' => 2,
-					'hint' => ''
+					// Surfaced as a toggle in the Native Features card so it
+					// sits alongside Push Notifications / Google Sign-In etc.
+					// — toggling OFF here strips `AppressAuthGateService` from
+					// the binary (see mutator.js FEATURE_KEYS), so it's a
+					// genuine build-time feature, not a runtime config tick.
+					'group' => 'native_features',
+					'tier'  => 'advanced'
 				]
 			],
 
-			// ── App Screens (tabs + standalone) ──────────────────────────
-			'app_screens' => [
-				'type' => 'repeater',
-				'label' => __( 'App Screens', 'appress' ),
-				'sanitize' => 'repeater',
+			// ── Dark Mode (Native Features object — feature-gated) ───────
+			// Build-time toggle. When OFF the mutator strips the entire
+			// dark-mode native bridge + slave JS injection (see mutator.js
+			// FEATURE_NAMES + Native Features card). Live values used at
+			// runtime (which class + localStorage key to inject when the
+			// device is in dark mode) live in `settings.dark_mode_options`
+			// further down in the `settings` category — admin can edit
+			// those without rebuilding.
+			'dark_mode' => [
+				'type' => 'object',
+				'sanitize' => 'object',
 				'default' => [],
 				'fields' => [
-					'_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
-					'wp_id' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
-					'type' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => 'custom_url' ],
-					'title' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
-					'url' => [ 'type' => 'text', 'sanitize' => 'url', 'default' => '' ],
-					'icon' => [ 'type' => 'text', 'sanitize' => 'text', 'default' => '' ],
-					'role' => [
-						'type' => 'select', 'sanitize' => 'text', 'default' => 'none',
-						'label' => __( 'Screen Role', 'appress' ),
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Auto Dark Mode', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => false,
+						'ui' => [ 'group' => 'native_features', 'tier' => 'advanced' ]
+					]
+				]
+			],
+			'auth_gate' => [
+				'type' => 'object',
+				'label' => __( 'Auth Screen', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [],
+				'fields' => [
+					'type' => [
+						'type' => 'select',
+						'label' => __( 'Content Source', 'appress' ),
+						'sanitize' => 'text',
+						// `page` (most common picked CPT) is the safe
+						// runtime default — was `screen` (legacy
+						// appress_screen-only pick); Vue's dropdown will
+						// fall through to "Custom URL" when the admin
+						// hasn't touched the field.
+						'default' => 'page',
 						'ui' => [
-							'group' => 'identity',
-							'options' => [
-								[ 'value' => 'none',          'label' => __( 'None',                'appress' ) ],
-								[ 'value' => 'home',          'label' => __( 'Homescreen',          'appress' ) ],
-								[ 'value' => 'auth',          'label' => __( 'Auth Screen',         'appress' ) ],
-								[ 'value' => 'notifications', 'label' => __( 'Notification Screen', 'appress' ) ],
-								[ 'value' => 'menu',          'label' => __( 'Left Menu Screen',    'appress' ) ],
-								[ 'value' => 'right_menu',    'label' => __( 'Right Menu Screen',   'appress' ) ],
-							]
+							'group' => 'require_auth',
+							// Options are runtime-built by Vue from
+							// `Apppress_Config.post_types` (every public CPT)
+							// + the `Custom URL` static entry + `All`. Schema
+							// `options` would just be stale documentation here
+							// — see `SingleAppView.vue`'s `contentSourceOptions`
+							// computed for the canonical list.
+							'hint' => __( 'Pick a Page / Post / any public post type — or enter a custom URL.', 'appress' )
 						]
 					],
-					'reload_on_click' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true,
-						'label' => __( 'Reload on reclick', 'appress' ),
-						'ui' => [ 'group' => 'behavior' ]
-					],
-					'always_reload' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false,
-						'label' => __( 'Always reload', 'appress' ),
-						'ui' => [ 'group' => 'behavior' ]
-					],
-					'show_web_header' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false,
-						'label' => __( 'Show Web Header', 'appress' ),
-						'ui' => [ 'group' => 'behavior', 'show_if' => 'type=appress_screen' ]
-					],
-					'show_web_footer' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false,
-						'label' => __( 'Show Web Footer', 'appress' ),
-						'ui' => [ 'group' => 'behavior', 'show_if' => 'type=appress_screen' ]
-					],
-					'use_general_config' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true,
-						'label' => __( 'Use Default Configuration', 'appress' ),
-						'ui' => [ 'group' => 'behavior' ]
-					],
-					'pull_to_refresh' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false,
-						'label' => __( 'Pull to refresh', 'appress' ),
-						'ui' => [ 'group' => 'behavior', 'show_if' => '!use_general_config' ]
-					],
-					'offline' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true,
-						'label' => __( 'Offline', 'appress' ),
-						'ui' => [ 'group' => 'behavior' ]
-					],
-					'preload' => [
-						'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false,
-						'label' => __( 'Preload', 'appress' ),
+					// Single source of truth. `type` selector above is
+					// purely a UX switch driving picker vs free-text input;
+					// both write here, native consumes only `url`.
+					'url' => [
+						'type' => 'url',
+						'label' => __( 'URL', 'appress' ),
+						'sanitize' => 'url',
+						'default' => '',
 						'ui' => [
-							'group' => 'preload',
-							'col_span' => 2,
-							'hint' => ''
+							'group' => 'require_auth',
+							'placeholder' => 'https://example.com/login'
 						]
-					],
-					'background_color' => [
-						'type' => 'color', 'sanitize' => 'text', 'default' => '',
-						'label' => __( 'Background Color', 'appress' ),
-						'ui' => [ 'group' => 'appearance', 'show_if' => '!use_general_config' ]
 					],
 				]
+			],
+
+			// ── App Screens repeater removed 2026-06-09 ──────────────────
+			// URLs travel directly on their consumer fields:
+			//   `bottom_navigation.items[].url`, `first_launch.url`,
+			//   `auth_gate.url`, `side_menu.url`, `right_menu.url`.
+			// The `appress_screen` CPT (Appress → Screens) still exists
+			// for site authors to manage screen-content posts — the admin
+			// can pick from these posts via a CPT picker that fills the
+			// target URL field, or type a Custom URL — both modes write
+			// the same shape. apps-controller's save handler auto-builds
+			// the legacy `app_screens` registry from referenced URLs so
+			// native binaries unchanged at the wire level.
+
+			// (Disable Web Ads, Analytics, Smart Prefetch, Page Routing fields
+			//  moved to top-level `settings` category — distributed via the WP-
+			//  side print hooks (wp_head printers, send_headers Cache-Control
+			//  override, `window.AppressAppSettings`) instead of baking into
+			//  the binary.)
+		]
+	],
+
+	// ════════════════════════════════════════════════════════════════════
+	//   Settings — fields the WP side distributes LIVE on every request.
+	//   No build engine touch: customer admin saves a field here, the
+	//   next page response carries the change with no rebuild required.
+	//
+	//   Distribution channels:
+	//     - Custom CSS  → `Frontend_Controller::print_app_css` (wp_head).
+	//     - Analytics + Web Ads → `print_analytics_js` + `print_ads_blocker_js`
+	//                              (wp_head priority 0, before page scripts).
+	//     - Smart Prefetch → `Injection_Controller::relax_cache_control_for_prefetch`
+	//                         (send_headers, overrides WP's no-cache).
+	//     - Subscreen rules → `Frontend_Controller::print_app_settings`
+	//                          (wp_head, native bridge reads `window.AppressAppSettings`).
+	//
+	//   `save_config` writes these to the dedicated `settings` DB column
+	//   (separate from `build_config`) so admin Settings-tab saves don't
+	//   bump `update_time_hash` and the build engine never sees them in
+	//   its payload.
+	// ════════════════════════════════════════════════════════════════════
+	'settings' => [
+		'label'  => __( 'App Settings', 'appress' ),
+		'fields' => [
+
+			// ── Custom CSS injected into every WebView ───────────────────
+			'css_all' => [
+				'type' => 'textarea',
+				'label' => __( 'Custom CSS (Global)', 'appress' ),
+				'sanitize' => 'css',
+				'default' => '',
+				'ui' => [ 'group' => 'custom_css', 'placeholder' => '.site-header { display: none; }', 'col_span' => 2 ]
+			],
+			'css_android' => [
+				'type' => 'textarea',
+				'label' => __( 'Custom CSS (Android)', 'appress' ),
+				'sanitize' => 'css',
+				'default' => '',
+				'ui' => [ 'group' => 'custom_css', 'placeholder' => '/* Android specific */' ]
+			],
+			'css_ios' => [
+				'type' => 'textarea',
+				'label' => __( 'Custom CSS (iOS)', 'appress' ),
+				'sanitize' => 'css',
+				'default' => '',
+				'ui' => [ 'group' => 'custom_css', 'placeholder' => '/* iOS specific */' ]
 			],
 
 			// ── Disable Web Ads (hide existing site ads when viewed in-app) ──
@@ -746,15 +1006,6 @@ return [
 				]
 			],
 
-			// ════════════════════════════════════════════════════════════
-			//   ABSORBED FROM former `live_config` category (2026-06-02 v2)
-			//   Customer apps boot from baked config and never re-fetch at
-			//   runtime, so the historical "runtime-mutable" split was
-			//   meaningless — every customer-facing change requires a
-			//   rebuild anyway. Collapsed into build_config so the schema
-			//   matches the actual lifecycle.
-			// ════════════════════════════════════════════════════════════
-
 			// ── Analytics ───────────────────────────────────────────────
 			'google_analytics_id' => [
 				'type' => 'text',
@@ -804,7 +1055,7 @@ return [
 				]
 			],
 
-			// ── Page routing overrides ──────────────────────────────────
+			// ── Page routing overrides (Subscreen rules) ────────────────
 			'inline_link_selectors' => [
 				'type' => 'textarea',
 				'label' => __( 'Stay-on-page link selectors', 'appress' ),
@@ -815,7 +1066,6 @@ return [
 					'col_span' => 2,
 					'placeholder' => ".my-tabs a\n#sub-nav a",
 					'hint' => __( 'One CSS selector per line.', 'appress' ),
-					'show_if' => 'subscreen.enabled',
 				],
 			],
 			'subscreen_url_patterns' => [
@@ -828,8 +1078,63 @@ return [
 					'col_span' => 2,
 					'placeholder' => "/?s=*\n/listings/*\n*?orderby=*",
 					'hint' => __( 'One URL pattern per line. * matches any characters.', 'appress' ),
-					'show_if' => 'subscreen.enabled',
 				],
+			],
+
+			// ── Dark Mode runtime values ────────────────────────────────
+			// Live: admin edits → next page load apply, no rebuild. The
+			// build-time gate lives in `build_config.dark_mode.enabled`
+			// (Native Features card) — when OFF the engine strips the
+			// entire native bridge + slave JS injection, so these values
+			// never reach the binary or the WebView. When ON, the slave
+			// JS reads `window.AppressAppSettings.dark_mode_options` and
+			// applies the configured class + localStorage signal so any
+			// WordPress dark-mode plugin convention (Dark Mode Toggle
+			// `darkmode--activated` + `darkmode=true`; WP Dark Mode
+			// `wp-dark-mode-active` + `wp_dark_mode_active=true`;
+			// custom themes) can plug in by typing its values here.
+			'dark_mode_options' => [
+				'type' => 'object',
+				'sanitize' => 'object',
+				'default' => [],
+				'fields' => [
+					'body_class' => [
+						'type' => 'text',
+						'label' => __( 'Body class', 'appress' ),
+						'sanitize' => 'text',
+						'default' => '',
+						'ui' => [
+							'group' => 'dark_mode',
+							'placeholder' => 'darkmode--activated',
+							'show_if' => 'dark_mode.enabled',
+							'hint' => __( 'Class added to <body> when the device is in dark mode. Check your dark-mode plugin docs (e.g. "darkmode--activated", "wp-dark-mode-active").', 'appress' )
+						]
+					],
+					'localstorage_key' => [
+						'type' => 'text',
+						'label' => __( 'LocalStorage key', 'appress' ),
+						'sanitize' => 'text',
+						'default' => '',
+						'ui' => [
+							'group' => 'dark_mode',
+							'placeholder' => 'darkmode',
+							'show_if' => 'dark_mode.enabled',
+							'hint' => __( 'Storage key the plugin reads to remember user preference. Leave blank if your plugin only uses the body class.', 'appress' )
+						]
+					],
+					'localstorage_value' => [
+						'type' => 'text',
+						'label' => __( 'LocalStorage value (when dark)', 'appress' ),
+						'sanitize' => 'text',
+						'default' => 'true',
+						'ui' => [
+							'group' => 'dark_mode',
+							'placeholder' => 'true',
+							'show_if' => 'dark_mode.enabled',
+							'hint' => __( 'Value written to the key above when dark mode is active (typically "true" or "dark"). When light, the key is removed.', 'appress' )
+						]
+					],
+				]
 			],
 		]
 	],

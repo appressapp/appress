@@ -71,19 +71,40 @@ class Assets_Controller extends Base_Controller {
 				if ( $is_dist ) {
 					$this->dist_script_handles[ $handle ] = true;
 					$shared ??= [
-						'ajaxUrl'   => home_url( '/?appress=1' ),
-						'homeUrl'   => home_url(),
-						'pluginUrl' => APPRESS_PLUGIN_URL,
-						'schema'    => \Appress\config( 'schema' ) ?: [],
+						'ajaxUrl'      => home_url( '/?appress=1' ),
+						'homeUrl'      => home_url(),
+						'pluginUrl'    => APPRESS_PLUGIN_URL,
+						'schema'       => \Appress\config( 'schema' ) ?: [],
 						// Vue admin UI translation dict — sourced from
 						// `app/i18n/vue-strings.php` which calls __()
 						// on every `t()` argument so xgettext / Loco
 						// scan picks them up. `useI18n.js` reads this
 						// dict at runtime; missing keys fall back to
 						// the source string.
-						'i18n'      => file_exists( APPRESS_PLUGIN_DIR . 'app/i18n/vue-strings.php' )
+						'i18n'         => file_exists( APPRESS_PLUGIN_DIR . 'app/i18n/vue-strings.php' )
 							? require APPRESS_PLUGIN_DIR . 'app/i18n/vue-strings.php'
 							: [],
+						// Per-integration runtime status (host plugin
+						// installed? plugin-specific context the admin
+						// Vue layer needs to gate UI on). Shared across
+						// every dist-script entry so any admin page can
+						// decide whether to render an integration's
+						// configuration UI without a second AJAX round
+						// trip. Currently consumed by:
+						//   - SingleAppView's TranslatePress sub-tab gate
+						//   - getNativeFeatureToggles skip filter for
+						//     features tagged `ui.requires_plugin`.
+						'integrations' => self::collect_integration_status(),
+						// Public post-types the admin can pick screen URLs
+						// from. Used by `PostSearchPicker.vue` (Home Screen,
+						// First Launch, Auth Gate, Side Menus, Bottom Nav
+						// items) to build the Content Source dropdown — admins
+						// can pick a Page / Post / Product / etc. without
+						// hand-typing the URL. The list is filtered via
+						// `appress/admin/pickable_post_types` so 3rd-party
+						// integrations (Voxel post types, WooCommerce
+						// variations, custom CPTs) can opt in.
+						'post_types'   => self::collect_pickable_post_types(),
 					];
 					wp_localize_script( $handle, 'Apppress_Config', $shared );
 					continue;
@@ -127,5 +148,109 @@ class Assets_Controller extends Base_Controller {
 			$tag,
 			1
 		);
+	}
+
+	/**
+	 * Detect installed integrations whose admin Vue layer wants to
+	 * gate UI on plugin availability. Each entry exposes `installed`
+	 * (the host plugin is active) plus integration-specific context
+	 * the Vue layer needs to render configuration UI without a
+	 * second AJAX round-trip.
+	 *
+	 * Currently:
+	 *   - `translatepress.installed`
+	 *   - `translatepress.default_language`
+	 *   - `translatepress.languages`
+	 *   - `translatepress.language_names` (code → human-readable name)
+	 */
+	/**
+	 * Public post-types the admin can pick a screen URL from. The
+	 * default list is every `public => true` post type WP knows about
+	 * (`get_post_types(['public' => true], 'objects')`), minus
+	 * `attachment` which doesn't make sense as a screen target.
+	 *
+	 * Each entry returns the fields the Vue picker needs to render a
+	 * grouped Content Source dropdown:
+	 *   - `slug`   — post type key (`page`, `post`, `appress_screen`, …)
+	 *   - `label`  — admin-facing name (`Pages`, `Posts`, …)
+	 *   - `singular` — singular label for placeholder copy
+	 *
+	 * Integrations (Voxel, WooCommerce subscriptions, custom CPTs) can
+	 * filter the list via `appress/admin/pickable_post_types` to add
+	 * non-`public` types or override labels.
+	 */
+	public static function collect_pickable_post_types(): array {
+		// Tighter selector than `public => true` alone: also require
+		// `show_in_nav_menus => true` so we catch user-facing content
+		// CPTs (Page, Post, Product, Voxel city/person, appress_screen)
+		// while excluding template / utility post types (Elementor
+		// templates, WP block library, navigation menu items, theme
+		// templates) that registered themselves `public` for preview
+		// purposes only.
+		$types = get_post_types( [
+			'public'            => true,
+			'show_in_nav_menus' => true,
+		], 'objects' );
+
+		// Hard blocklist for known template / internal post types that
+		// still slip past the `show_in_nav_menus` filter on some plugin
+		// versions. Customers can extend via the filter below.
+		$blocklist = [
+			'attachment',
+			'elementor_library',
+			'e-floating-buttons',
+			'wp_block',
+			'wp_template',
+			'wp_template_part',
+			'wp_navigation',
+		];
+
+		$result = [];
+		foreach ( (array) $types as $slug => $obj ) {
+			if ( in_array( $slug, $blocklist, true ) ) continue;
+			$result[] = [
+				'slug'     => (string) $slug,
+				'label'    => isset( $obj->labels->name ) ? (string) $obj->labels->name : (string) $slug,
+				'singular' => isset( $obj->labels->singular_name ) ? (string) $obj->labels->singular_name : (string) $slug,
+			];
+		}
+		// Stable alphabetical order so the dropdown reads predictably
+		// across sites + after admin adds / removes CPT plugins.
+		usort( $result, function ( $a, $b ) { return strcasecmp( $a['label'], $b['label'] ); } );
+
+		/**
+		 * Filter the post types offered in the admin's Content Source
+		 * dropdown. Integrations can prepend their own entries or strip
+		 * built-ins they want to hide.
+		 *
+		 * @param array $result Default list (`public` + `show_in_nav_menus` CPTs minus the template blocklist).
+		 */
+		$result = (array) apply_filters( 'appress/admin/pickable_post_types', $result );
+		return array_values( $result );
+	}
+
+	public static function collect_integration_status(): array {
+		$status = [
+			'translatepress' => [ 'installed' => false ],
+		];
+
+		if ( class_exists( '\\Appress\\Integration\\Translatepress\\Services\\Url_Translator' ) ) {
+			$translator = new \Appress\Integration\Translatepress\Services\Url_Translator();
+			if ( $translator->is_active() ) {
+				$trp_settings    = $translator->get_settings();
+				$default_lang    = (string) ( $trp_settings['default_language'] ?? '' );
+				$languages       = array_values( (array) ( $trp_settings['languages'] ?? [] ) );
+				$codes_for_lookup = array_values( array_unique( array_filter( array_merge( [ $default_lang ], $languages ) ) ) );
+
+				$status['translatepress'] = [
+					'installed'        => true,
+					'default_language' => $default_lang,
+					'languages'        => $languages,
+					'language_names'   => (object) $translator->get_language_names( $codes_for_lookup ),
+				];
+			}
+		}
+
+		return $status;
 	}
 }

@@ -304,13 +304,40 @@ class Apps_Controller extends Base_Controller {
 		return $out;
 	}
 
+	/**
+	 * Recursively sanitize a free-form assoc-array of string leaves —
+	 * the workhorse behind the `dict` sanitize type. Keys collapse to
+	 * a safe-character allowlist (letters, digits, underscore, dash,
+	 * dot) so they round-trip back into JSON / JS object keys without
+	 * needing per-call escaping. Scalar leaves pass through
+	 * `sanitize_text_field` (strips control chars + tags); nested
+	 * arrays recurse. Anything else (objects, resources) is dropped.
+	 */
+	private function sanitize_dict_recursive( array $value ): array {
+		$out = [];
+		foreach ( $value as $k => $v ) {
+			$safe_key = preg_replace( '/[^A-Za-z0-9_\-.]/', '', (string) $k );
+			if ( $safe_key === '' ) continue;
+			if ( is_array( $v ) ) {
+				$out[ $safe_key ] = $this->sanitize_dict_recursive( $v );
+			} elseif ( is_scalar( $v ) ) {
+				$out[ $safe_key ] = sanitize_text_field( (string) $v );
+			}
+		}
+		return $out;
+	}
+
 	private function sanitize_field( $value, $field_config, $field_key = 'unknown' ) {
-		$valid_types = [ 'text', 'url', 'number', 'boolean', 'color', 'file', 'image', 'object', 'repeater', 'textarea', 'file_drag_drop', 'select', 'icon_picker' ];
+		$valid_types = [ 'text', 'url', 'number', 'boolean', 'color', 'file', 'image', 'object', 'repeater', 'textarea', 'file_drag_drop', 'select', 'icon_picker', 'dict' ];
 
 		if ( empty( $field_config['type'] ) || ! in_array( $field_config['type'], $valid_types, true ) ) {
 			throw new \Exception( esc_html__( 'Invalid', 'appress' ) );
 		}
 
+		// `object` + `repeater` enumerate child fields explicitly so the
+		// sanitizer can recurse into a known shape; `dict` is the escape
+		// hatch for runtime-keyed maps (e.g. translation matrices keyed
+		// by dynamic ids) where pre-declaring `fields` is impossible.
 		if ( in_array( $field_config['type'], [ 'object', 'repeater' ] ) && empty( $field_config['fields'] ) ) {
 			throw new \Exception( esc_html__( 'Invalid', 'appress' ) );
 		}
@@ -395,6 +422,24 @@ class Apps_Controller extends Base_Controller {
 					$sanitized_list[] = $sanitized_item;
 				}
 				return $sanitized_list;
+
+			case 'dict':
+				// Free-form assoc-array of arbitrarily-nested string
+				// leaves. Used for runtime-keyed maps the admin builds
+				// up at edit time (e.g. TranslatePress's
+				// `translatepress.strings[tab_id][lang_code] = title`)
+				// where `fields` can't be pre-declared because the keys
+				// depend on user-created data (tab ids, language codes
+				// added in the TRP plugin, etc.).
+				//
+				// Sanitization rules:
+				//   - Non-array input → `[]` (drop garbage).
+				//   - Keys: cast to string + `sanitize_key`-ish allowlist
+				//     so they're safe to use as array keys + map ids.
+				//   - Values: recurse into nested arrays; cast scalar
+				//     leaves through `sanitize_text_field`.
+				if ( ! is_array( $value ) ) return [];
+				return $this->sanitize_dict_recursive( $value );
 
 			case 'text':
 				// `$value` arrives already-unslashed because `save_config`
@@ -489,6 +534,12 @@ class Apps_Controller extends Base_Controller {
 				}
 
 				if ( $category === 'build_config' ) {
+					// `url` (Website URL) is admin-hidden and auto-detected
+					// — overwrite whatever the client sent with the canonical
+					// `home_url()` so the build engine + native code never
+					// receive a stale or hand-edited value. Single source of
+					// truth = the WP install this admin runs on.
+					$sanitized_category['url'] = home_url();
 					// Bump time hash so the host preview app (my.appress.app)
 					// can short-circuit on cold-start when nothing changed.
 					$sanitized_category['update_time_hash'] = (string) time();
@@ -530,6 +581,12 @@ class Apps_Controller extends Base_Controller {
 			}
 
 			$wpdb->update( $table, $update_payload, [ 'id' => $app_id ] );
+
+			// Invalidate the cached home-screen path so the next
+			// `Frontend_Controller::print_app_settings` request reads
+			// the fresh value off DB (admin may have changed Home
+			// Screen → URL during this save).
+			\Appress\Controllers\App\Frontend_Controller::clear_home_path_cache( $app_id );
 
 			// Push backup to Central SaaS (fire-and-forget, non-blocking).
 			// Token in DB is encrypted at-rest → decrypt before sending plaintext over HTTPS.
@@ -947,28 +1004,12 @@ class Apps_Controller extends Base_Controller {
 			$build_info = ! empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 			if ( ! is_array( $build_info ) ) $build_info = [];
 
-			// User CSS (css_all / css_ios / css_android) is now emitted
-			// by the plugin at request time via the `wp_head` printer
-			// (`Frontend_Controller::print_app_css`) — always live,
-			// runs every `appress/app/css` integration hook. Stripping
-			// these from the build payload here:
-			//   1. Trims a few KB from every build job's transport.
-			//   2. Removes a stale frozen-at-build-time snapshot that
-			//      can never be in sync with the live PHP path (so a
-			//      build engine bug that accidentally re-injects it
-			//      can't confuse future debugging).
-			//   3. Forces native to a single source of truth.
-			// Admin textarea values stay in the DB row — they're the
-			// input to `get_app_css()` which the wp_head printer reads.
-			unset( $build_info['css_all'], $build_info['css_ios'], $build_info['css_android'] );
-			// Web-ad blocker also moved to `wp_head` print (priority 0)
-			// — same rationale as CSS: live update, integration filter,
-			// single source of truth at request time.
-			unset( $build_info['disable_web_ads'], $build_info['disable_web_ads_platforms'], $build_info['disable_web_ads_custom_hosts'] );
-			// Analytics injection also runs via `wp_head` print now —
-			// strip the field group for the same reason: live update
-			// + integration filter + single source of truth.
-			unset( $build_info['google_analytics_id'], $build_info['exclude_all_web_ga'], $build_info['exclude_web_ga_ids'] );
+			// Live-config fields (Custom CSS, Disable Web Ads, Analytics,
+			// Smart Prefetch, Subscreen routing rules) live in the
+			// dedicated `settings` DB column (1.4.0 schema split) and the
+			// build engine never sees them. The `unset()` scrubs that
+			// used to live here are gone for good — the storage layer
+			// enforces the boundary now.
 
 			// Signing credentials live in the encrypted `credentials` JSON
 			// column. Decrypt here for transit to Central over HTTPS — Central
@@ -1017,6 +1058,17 @@ class Apps_Controller extends Base_Controller {
 				// Native code uses this to call /?appress=1&action=app.get_config&app_id=X
 				// on the CLIENT site. Central post_id is a different number.
 				'app_id'           => $app_id,
+
+				// Subscreen routing rules + Smart Prefetch settings live
+				// on the WP side now — printed into every page's wp_head
+				// as `window.AppressAppSettings` (see
+				// `frontend-controller::print_app_settings`) and consumed
+				// by `AppressAppSettingsService` at runtime. Stripping
+				// them from the build payload keeps the baked config
+				// (and the `__cstring` segment Apple's 4.3 classifier
+				// scans) clean: no more shared `subscreen_url_patterns`
+				// JSON shape across customer binaries. Admin edits
+				// apply on the next page load with no rebuild.
 				// Base64-encoded so binary Firebase config bytes survive
 				// JSON transport without escaping issues. Overrides the
 				// raw `build_info` values which were stored verbatim.
@@ -1051,6 +1103,23 @@ class Apps_Controller extends Base_Controller {
 				// Google Play auto-publish (premium — consumed if present).
 				'google_play_service_account_json' => $play_sa_b64,
 			] );
+
+			// Apply the `appress/app/live_config` filter to the build
+			// payload — same hook `Frontend_Controller::handle_boot`
+			// runs to enrich `app.boot` for the host preview app.
+			// Integrations (TranslatePress) inject their per-language
+			// variant map here (`translatepress.languages[code].{slug,
+			// host, config}`) so the engine bakes it into
+			// `AppressBakedConfig` and customer apps consume it
+			// straight from the binary — same baking pattern as
+			// `bottom_navigation`. Pre-fix, the filter only ran on
+			// the live `app.boot` path → host preview app received
+			// variants but customer apps shipped with
+			// `translatepress: {enabled, strings: []}` and missing
+			// `languages`, so the native variant apply guard
+			// returned early and TP was a silent no-op on every
+			// customer install.
+			$app_config = (array) apply_filters( 'appress/app/live_config', $app_config, $app_id );
 
 			// POST the structured payload to Central — token is decrypted to plaintext for the HTTPS hop.
 			$response = wp_remote_post( $central_url . '/?my_appress=1&action=build.request', [
