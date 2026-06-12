@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.35
+Stable tag: 1.0.0.36
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.36 =
+* Microphone permission is now a separate toggle (off by default) — most apps no longer ask users for microphone access. Turn it on only if your site uses voice notes or live audio.
+* Renamed "Web Media Access" to "Photo & Camera Access" so the toggle reads as what it actually does (camera + photo library).
 
 = 1.0.0.35 =
 * Build Config now has a new "In-App Strings" tab where you can change every user-facing message the app shows — sign-in prompts, error toasts, QR scanner labels, file picker buttons, and more. Type your wording once; the app picks it up on the next build.
@@ -305,6 +309,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.36 =
+Microphone permission is now opt-in. Apps that don't use voice features ship a leaner permissions list.
 
 = 1.0.0.35 =
 New In-App Strings tab lets you customise every message the app shows; iOS permission popups are now editable per app and per language.

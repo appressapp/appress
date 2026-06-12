@@ -1025,10 +1025,10 @@ class Apps_Controller extends Base_Controller {
 				}
 			};
 			if ( $feature_on( 'geolocation' ) )                                 $require_perm( 'location',          'Geolocation' );
-			if ( $feature_on( 'web_media' ) || $feature_on( 'qr_scanner' ) )    $require_perm( 'camera',            'Web Media / QR Scanner' );
-			if ( $feature_on( 'web_media' ) )                                   $require_perm( 'microphone',        'Web Media' );
-			if ( $feature_on( 'web_media' ) )                                   $require_perm( 'photo_library',     'Web Media' );
-			if ( $feature_on( 'web_media' ) )                                   $require_perm( 'photo_library_add', 'Web Media' );
+			if ( $feature_on( 'photo_camera' ) || $feature_on( 'qr_scanner' ) ) $require_perm( 'camera',            'Photo & Camera / QR Scanner' );
+			if ( $feature_on( 'microphone' ) )                                  $require_perm( 'microphone',        'Microphone' );
+			if ( $feature_on( 'photo_camera' ) )                                $require_perm( 'photo_library',     'Photo & Camera' );
+			if ( $feature_on( 'photo_camera' ) )                                $require_perm( 'photo_library_add', 'Photo & Camera' );
 			if ( $feature_on( 'biometric' ) )                                   $require_perm( 'face_id',           'Biometric' );
 			if ( ! empty( $missing_perms ) ) {
 				throw new \Exception( sprintf(

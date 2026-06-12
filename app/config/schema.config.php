@@ -397,34 +397,54 @@ return [
 				]
 			],
 
-			// Web Media Access — owns the generic camera / microphone /
-			// photo library permission surface used by any WordPress
-			// page's `<input type="file">` capture flow, WebRTC, voice
-			// notes, and avatar uploaders. Default ON because the most
+			// Photo & Camera Access — owns the camera + photo library
+			// permission surface used by `<input type="file">` capture
+			// flow + avatar uploaders. Default ON because the most
 			// common customer surface (profile photo upload, WC product
-			// review, chat) triggers one of these prompts. Switching
-			// off strips the matching plist keys + the
-			// `AppressFileChooserService` glue from the binary,
-			// reducing both the framework fingerprint AND the
-			// __cstring fingerprint Apple's 4.3(a) clustering reads.
-			// The actual usage-description strings live in the shared
-			// `ios_permissions` block below — admin types each one
-			// once even though it's referenced by multiple features.
-			'web_media' => [
+			// review) triggers one of these prompts.
+			'photo_camera' => [
 				'type' => 'object',
-				'label' => __( 'Web Media Access', 'appress' ),
+				'label' => __( 'Photo & Camera Access', 'appress' ),
 				'sanitize' => 'object',
 				'default' => [ 'enabled' => true ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Web Media Access (Camera / Microphone / Photos)', 'appress' ),
+						'label' => __( 'Photo & Camera Access', 'appress' ),
 						'sanitize' => 'boolean',
 						'default' => true,
 						'ui' => [
 							'group' => 'native_features',
 							'tier'  => 'basic',
-							'doc_url' => 'https://docs.appress.app/native-features/web-media'
+							'doc_url' => 'https://docs.appress.app/native-features/photo-camera'
+						]
+					],
+				],
+			],
+
+			// Microphone Access — separate from Photo & Camera because
+			// most WordPress sites never trigger a microphone prompt
+			// (rare: WebRTC voice/video chat plugins, voice-note
+			// messengers, audio recorders). Default OFF so a typical
+			// listing / e-commerce / blog ships without
+			// `NSMicrophoneUsageDescription`, keeping the plist
+			// fingerprint clean + avoiding the unused-permission
+			// flag Apple sometimes raises during review.
+			'microphone' => [
+				'type' => 'object',
+				'label' => __( 'Microphone Access', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => false ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Microphone Access', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => false,
+						'ui' => [
+							'group' => 'native_features',
+							'tier'  => 'advanced',
+							'doc_url' => 'https://docs.appress.app/native-features/microphone'
 						]
 					],
 				],
@@ -486,10 +506,10 @@ return [
 						'label' => __( 'Camera', 'appress' ),
 						'sanitize' => 'textarea',
 						'default' => '',
-						'required_if_any' => [ 'web_media.enabled' => true, 'qr_scanner.enabled' => true ],
+						'required_if_any' => [ 'photo_camera.enabled' => true, 'qr_scanner.enabled' => true ],
 						'ui' => [
 							'group' => 'ios_permissions',
-							'requires' => [ 'web_media', 'qr_scanner' ],
+							'requires' => [ 'photo_camera', 'qr_scanner' ],
 							'rows' => 2,
 							'placeholder' => __( 'Why your app uses the camera.', 'appress' ),
 						],
@@ -499,10 +519,10 @@ return [
 						'label' => __( 'Microphone', 'appress' ),
 						'sanitize' => 'textarea',
 						'default' => '',
-						'required_if' => [ 'web_media.enabled' => true ],
+						'required_if' => [ 'microphone.enabled' => true ],
 						'ui' => [
 							'group' => 'ios_permissions',
-							'requires' => [ 'web_media' ],
+							'requires' => [ 'microphone' ],
 							'rows' => 2,
 							'placeholder' => __( 'Why your app uses the microphone.', 'appress' ),
 						],
@@ -512,10 +532,10 @@ return [
 						'label' => __( 'Photo Library (Read)', 'appress' ),
 						'sanitize' => 'textarea',
 						'default' => '',
-						'required_if' => [ 'web_media.enabled' => true ],
+						'required_if' => [ 'photo_camera.enabled' => true ],
 						'ui' => [
 							'group' => 'ios_permissions',
-							'requires' => [ 'web_media' ],
+							'requires' => [ 'photo_camera' ],
 							'rows' => 2,
 							'placeholder' => __( 'Why your app reads photos.', 'appress' ),
 						],
@@ -525,10 +545,10 @@ return [
 						'label' => __( 'Photo Library (Save)', 'appress' ),
 						'sanitize' => 'textarea',
 						'default' => '',
-						'required_if' => [ 'web_media.enabled' => true ],
+						'required_if' => [ 'photo_camera.enabled' => true ],
 						'ui' => [
 							'group' => 'ios_permissions',
-							'requires' => [ 'web_media' ],
+							'requires' => [ 'photo_camera' ],
 							'rows' => 2,
 							'placeholder' => __( 'Why your app saves photos.', 'appress' ),
 						],
