@@ -1004,6 +1004,40 @@ class Apps_Controller extends Base_Controller {
 			$build_info = ! empty( $row['build_config'] ) ? json_decode( $row['build_config'], true ) : [];
 			if ( ! is_array( $build_info ) ) $build_info = [];
 
+			// Validate iOS permission descriptions — every plist usage
+			// string the engine will need MUST be filled in. Build
+			// engine's `03-post-config.js` ALSO throws on missing
+			// strings (defence-in-depth), but failing fast here gives
+			// the admin a clear message before the payload even
+			// crosses to Central + the engine. Rule set mirrors the
+			// engine's `requirePerm()` calls one-for-one.
+			$ios_perms = isset( $build_info['ios_permissions'] ) && is_array( $build_info['ios_permissions'] ) ? $build_info['ios_permissions'] : [];
+			$feature_on = function ( $key ) use ( $build_info ) {
+				$f = $build_info[ $key ] ?? null;
+				if ( ! is_array( $f ) ) return false;
+				return ! empty( $f['enabled'] );
+			};
+			$missing_perms = [];
+			$require_perm = function ( $key, $feature_label ) use ( $ios_perms, &$missing_perms ) {
+				$v = isset( $ios_perms[ $key ] ) ? trim( (string) $ios_perms[ $key ] ) : '';
+				if ( $v === '' ) {
+					$missing_perms[] = sprintf( '%s (required by %s)', $key, $feature_label );
+				}
+			};
+			if ( $feature_on( 'geolocation' ) )                                 $require_perm( 'location',          'Geolocation' );
+			if ( $feature_on( 'web_media' ) || $feature_on( 'qr_scanner' ) )    $require_perm( 'camera',            'Web Media / QR Scanner' );
+			if ( $feature_on( 'web_media' ) )                                   $require_perm( 'microphone',        'Web Media' );
+			if ( $feature_on( 'web_media' ) )                                   $require_perm( 'photo_library',     'Web Media' );
+			if ( $feature_on( 'web_media' ) )                                   $require_perm( 'photo_library_add', 'Web Media' );
+			if ( $feature_on( 'biometric' ) )                                   $require_perm( 'face_id',           'Biometric' );
+			if ( ! empty( $missing_perms ) ) {
+				throw new \Exception( sprintf(
+					/* translators: %s = comma-separated list of missing permission keys */
+					esc_html__( 'Fill in the iOS Permission Descriptions before requesting a build. Missing: %s. Open Build → Features → iOS Permission Descriptions.', 'appress' ),
+					esc_html( implode( ', ', $missing_perms ) )
+				) );
+			}
+
 			// Live-config fields (Custom CSS, Disable Web Ads, Analytics,
 			// Smart Prefetch, Subscreen routing rules) live in the
 			// dedicated `settings` DB column (1.4.0 schema split) and the
@@ -1120,6 +1154,26 @@ class Apps_Controller extends Base_Controller {
 			// returned early and TP was a silent no-op on every
 			// customer install.
 			$app_config = (array) apply_filters( 'appress/app/live_config', $app_config, $app_id );
+
+			// Default language for the mobile binary. Apple uses this
+			// for `CFBundleDevelopmentRegion` (the "Primary Language"
+			// in App Store Connect) and Android uses it as the
+			// unqualified `res/values/strings.xml` fallback when the
+			// device locale doesn't match any TP-translated `values-<lang>/`.
+			// Source: TP plugin's `default_language` when TP is on
+			// (so the mobile binary matches the WP site's own default
+			// pick), else WP's `get_locale()` base. Engine reads
+			// `payload.default_language` in `injectors/*.js` and
+			// `03-post-config.js`.
+			$tp_default = isset( $app_config['translatepress']['default_language'] )
+				? trim( (string) $app_config['translatepress']['default_language'] )
+				: '';
+			if ( $tp_default === '' || empty( $app_config['translatepress']['enabled'] ) ) {
+				$site_locale  = (string) get_locale();
+				$lang_base    = substr( $site_locale, 0, 2 );
+				$tp_default   = strtolower( $lang_base ?: 'en' );
+			}
+			$app_config['default_language'] = $tp_default;
 
 			// POST the structured payload to Central — token is decrypted to plaintext for the HTTPS hop.
 			$response = wp_remote_post( $central_url . '/?my_appress=1&action=build.request', [

@@ -49,10 +49,11 @@ class Translatepress_Controller extends \Appress\Controllers\Base_Controller {
 			return;
 		}
 
-		// Per-app sub-tab → "Clear boot cache" button → AJAX endpoint.
-		// Always-on so admins can invalidate the boot cache during
-		// debugging without flipping every per-app toggle.
-		new Controllers\Settings_Controller();
+		// (Removed Settings_Controller — its sole job was the legacy
+		// "Clear boot cache" AJAX endpoint. Per the build-time-bake
+		// refactor, every TP value, including translations, ships
+		// baked into AppressBakedConfig; nothing reads from the boot
+		// cache that the controller used to invalidate.)
 
 		// Boot enrichment + switcher shortcode + user-language store.
 		// All three are inert at runtime when no app has the per-app

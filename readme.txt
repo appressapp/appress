@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.33
+Stable tag: 1.0.0.35
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,20 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.35 =
+* Build Config now has a new "In-App Strings" tab where you can change every user-facing message the app shows — sign-in prompts, error toasts, QR scanner labels, file picker buttons, and more. Type your wording once; the app picks it up on the next build.
+* iOS permission popups (camera, microphone, photo library, location, Face ID) are now editable per app and per language. Write your own reason in the language your users speak.
+* TranslatePress moved into Build Config and now bakes every translation into the app at build time — no runtime fetch. A new section in the TranslatePress tab lets you translate the In-App Strings and iOS permission popups for every language you publish.
+* Cleaner Build Config form: feature toggles read more clearly ("Login by QR", "Dark Mode"), and string and permission fields only show up for features that are turned on.
+* Better fix for the home screen reload: tapping the home tab now reloads the page, and the loading spinner shows reliably on iOS.
+
+= 1.0.0.34 =
+* Build Config form reorganised into 3 sections — Build (baked into the app), Settings (live, no rebuild), and Credentials. Easier to find each setting.
+* Dark Mode is now a per-app toggle in Native Features. Turn it on, type the body class your dark-mode plugin uses, and the app applies it automatically when the device switches to dark mode.
+* Per-tab toggles in Bottom Navigation for enabling each tab, preloading content when the app opens, and pull-to-refresh.
+* Home Screen URL is now a single source of truth — change it in Build Config → Home Screen and every "go home" tab and gate follows.
+* Fixed TranslatePress not actually applying on customer apps — your translations now reach the app reliably.
 
 = 1.0.0.33 =
 * Fixed Vietnamese / non-ASCII characters in bottom nav titles, side menu labels, and other text fields appearing as garbled Unicode escapes inside the app.
@@ -291,6 +305,12 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.35 =
+New In-App Strings tab lets you customise every message the app shows; iOS permission popups are now editable per app and per language.
+
+= 1.0.0.34 =
+Build Config reorganised into Build / Settings / Credentials sections; per-app Dark Mode toggle and per-tab Bottom Navigation controls.
 
 = 1.0.0.31 =
 Custom CSS edits now apply inside the app in real time — no new build needed.

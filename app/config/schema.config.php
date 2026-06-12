@@ -359,13 +359,13 @@ return [
 
 			'qr_scanner' => [
 				'type' => 'object',
-				'label' => __( 'QR Code Scanner', 'appress' ),
+				'label' => __( 'Login by QR', 'appress' ),
 				'sanitize' => 'object',
 				'default' => [ 'enabled' => false ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'QR Scanner', 'appress' ),
+						'label' => __( 'Login by QR', 'appress' ),
 						'sanitize' => 'boolean',
 						'default' => false,
 						'ui' => [
@@ -395,6 +395,158 @@ return [
 						]
 					],
 				]
+			],
+
+			// Web Media Access — owns the generic camera / microphone /
+			// photo library permission surface used by any WordPress
+			// page's `<input type="file">` capture flow, WebRTC, voice
+			// notes, and avatar uploaders. Default ON because the most
+			// common customer surface (profile photo upload, WC product
+			// review, chat) triggers one of these prompts. Switching
+			// off strips the matching plist keys + the
+			// `AppressFileChooserService` glue from the binary,
+			// reducing both the framework fingerprint AND the
+			// __cstring fingerprint Apple's 4.3(a) clustering reads.
+			// The actual usage-description strings live in the shared
+			// `ios_permissions` block below — admin types each one
+			// once even though it's referenced by multiple features.
+			'web_media' => [
+				'type' => 'object',
+				'label' => __( 'Web Media Access', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [ 'enabled' => true ],
+				'fields' => [
+					'enabled' => [
+						'type' => 'boolean',
+						'label' => __( 'Web Media Access (Camera / Microphone / Photos)', 'appress' ),
+						'sanitize' => 'boolean',
+						'default' => true,
+						'ui' => [
+							'group' => 'native_features',
+							'tier'  => 'basic',
+							'doc_url' => 'https://docs.appress.app/native-features/web-media'
+						]
+					],
+				],
+			],
+
+			// ── iOS Permission Descriptions ────────────────────────────────
+			// Shared Info.plist usage strings — each entry lives ONCE here
+			// and declares which native features require it via
+			// `ui.requires`. The Vue admin renders a single block in
+			// build-features (separate card from Basic / Advanced toggles)
+			// and shows each field when ANY listed feature is enabled
+			// (`requires: []` or missing = always visible). The Build
+			// Engine reads each string from `configData.ios_permissions
+			// .<key>`, falls back to the default, and injects it into the
+			// matching plist key set — `location` fills all three
+			// NSLocation* variants, `camera` is shared by web_media + qr,
+			// etc.
+			//
+			// Two reasons for the shared block instead of per-feature
+			// children:
+			//   1. Same string CAN be required by multiple features
+			//      (Camera → web_media OR qr_scanner). Putting it on one
+			//      feature would leave the other branch without input;
+			//      duplicating it would give admin two boxes for the same
+			//      Info.plist key.
+			//   2. Apple's 4.3(a) cross-account similarity ML reads
+			//      plist `__cstring` literals straight out of the binary.
+			//      Hardcoded boilerplate strings shipped identical across
+			//      every Appress build — admin typing their own wording
+			//      varies the fingerprint per customer.
+			'ios_permissions' => [
+				'type' => 'object',
+				'label' => __( 'iOS Permission Descriptions', 'appress' ),
+				'sanitize' => 'object',
+				'default' => [
+					'location'          => '',
+					'camera'            => '',
+					'microphone'        => '',
+					'photo_library'     => '',
+					'photo_library_add' => '',
+					'face_id'           => '',
+				],
+				'fields' => [
+					'location' => [
+						'type' => 'textarea',
+						'label' => __( 'Location', 'appress' ),
+						'sanitize' => 'textarea',
+						'default' => '',
+						'required_if' => [ 'geolocation.enabled' => true ],
+						'ui' => [
+							'group' => 'ios_permissions',
+							'requires' => [ 'geolocation' ],
+							'rows' => 2,
+							'placeholder' => __( 'Why your app needs location.', 'appress' ),
+						],
+					],
+					'camera' => [
+						'type' => 'textarea',
+						'label' => __( 'Camera', 'appress' ),
+						'sanitize' => 'textarea',
+						'default' => '',
+						'required_if_any' => [ 'web_media.enabled' => true, 'qr_scanner.enabled' => true ],
+						'ui' => [
+							'group' => 'ios_permissions',
+							'requires' => [ 'web_media', 'qr_scanner' ],
+							'rows' => 2,
+							'placeholder' => __( 'Why your app uses the camera.', 'appress' ),
+						],
+					],
+					'microphone' => [
+						'type' => 'textarea',
+						'label' => __( 'Microphone', 'appress' ),
+						'sanitize' => 'textarea',
+						'default' => '',
+						'required_if' => [ 'web_media.enabled' => true ],
+						'ui' => [
+							'group' => 'ios_permissions',
+							'requires' => [ 'web_media' ],
+							'rows' => 2,
+							'placeholder' => __( 'Why your app uses the microphone.', 'appress' ),
+						],
+					],
+					'photo_library' => [
+						'type' => 'textarea',
+						'label' => __( 'Photo Library (Read)', 'appress' ),
+						'sanitize' => 'textarea',
+						'default' => '',
+						'required_if' => [ 'web_media.enabled' => true ],
+						'ui' => [
+							'group' => 'ios_permissions',
+							'requires' => [ 'web_media' ],
+							'rows' => 2,
+							'placeholder' => __( 'Why your app reads photos.', 'appress' ),
+						],
+					],
+					'photo_library_add' => [
+						'type' => 'textarea',
+						'label' => __( 'Photo Library (Save)', 'appress' ),
+						'sanitize' => 'textarea',
+						'default' => '',
+						'required_if' => [ 'web_media.enabled' => true ],
+						'ui' => [
+							'group' => 'ios_permissions',
+							'requires' => [ 'web_media' ],
+							'rows' => 2,
+							'placeholder' => __( 'Why your app saves photos.', 'appress' ),
+						],
+					],
+					'face_id' => [
+						'type' => 'textarea',
+						'label' => __( 'Face ID', 'appress' ),
+						'sanitize' => 'textarea',
+						'default' => '',
+						'required_if' => [ 'biometric.enabled' => true ],
+						'ui' => [
+							'group' => 'ios_permissions',
+							'requires' => [ 'biometric' ],
+							'rows' => 2,
+							'placeholder' => __( 'Why your app uses Face ID.', 'appress' ),
+						],
+					],
+				],
 			],
 
 			// Subscreen — when enabled, link taps open the destination in a
@@ -430,7 +582,14 @@ return [
 				'type' => 'object',
 				'label' => __( 'TranslatePress', 'appress' ),
 				'sanitize' => 'object',
-				'default' => [ 'enabled' => false, 'strings' => [] ],
+				// `strings`                  → bottom-nav title translations
+				// `app_string_translations`  → In-App Strings per-language
+				//                              overrides; the build engine
+				//                              emits a locale slot when at
+				//                              least one key is filled, so
+				//                              empty maps don't bloat the
+				//                              binary's i18n dictionary.
+				'default' => [ 'enabled' => false, 'strings' => [], 'app_string_translations' => [] ],
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
@@ -462,6 +621,32 @@ return [
 					// `object` would require pre-declared `fields` which
 					// can't enumerate dynamic tab ids.
 					'strings' => [
+						'type'     => 'dict',
+						'sanitize' => 'dict',
+						'default'  => [],
+					],
+					// In-App String translations per TP language. Shape:
+					//   { <lang>: { <I18N_KEY>: <translated text>, ... }, ... }
+					// Build Engine iterates the outer map and emits a
+					// locale slot for any language that has at least one
+					// filled key (empty languages don't bloat the binary).
+					// Stored via the `dict` sanitizer because the outer
+					// language keys (vi, fr, …) are runtime data, not
+					// pre-declared.
+					'app_string_translations' => [
+						'type'     => 'dict',
+						'sanitize' => 'dict',
+						'default'  => [],
+					],
+					// iOS Permission Description translations per TP
+					// language. Shape:
+					//   { <lang>: { location: '…', camera: '…', … } }
+					// Build Engine writes one `<lang>.lproj/InfoPlist.strings`
+					// per language so iOS shows the matching wording in
+					// the system permission popup based on device locale.
+					// Same key set as `build_config.ios_permissions.fields`.
+					// Empty language buckets are skipped.
+					'ios_permission_translations' => [
 						'type'     => 'dict',
 						'sanitize' => 'dict',
 						'default'  => [],
@@ -587,7 +772,7 @@ return [
 							// (`AppressConfigService.isScreenPullToRefresh`)
 							// read it via the standard screenData lookup.
 							'enabled'         => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true ],
-							'preload'         => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false ],
+							'preload'         => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true ],
 							'pull_to_refresh' => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => true ],
 							'indicator' => [ 'type' => 'select', 'sanitize' => 'text', 'default' => 'none' ],
 							'custom_indicator_style'     => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false ],
@@ -799,7 +984,7 @@ return [
 				'fields' => [
 					'enabled' => [
 						'type' => 'boolean',
-						'label' => __( 'Auto Dark Mode', 'appress' ),
+						'label' => __( 'Dark Mode', 'appress' ),
 						'sanitize' => 'boolean',
 						'default' => false,
 						'ui' => [ 'group' => 'native_features', 'tier' => 'advanced' ]
@@ -866,6 +1051,27 @@ return [
 			//  side print hooks (wp_head printers, send_headers Cache-Control
 			//  override, `window.AppressAppSettings`) instead of baking into
 			//  the binary.)
+
+			// ── In-App Strings ────────────────────────────────────────────────
+			// Every user-facing string baked into the iOS Dictionary /
+			// Android HashMap at build time. The Build Engine merges these
+			// customer values OVER the default `i18n.json` in every locale
+			// slot — so the cross-build `__cstring` fingerprint Apple's
+			// 4.3(a) cluster ML reads varies per app even when the customer
+			// only types in one language. Empty field → engine falls back to
+			// the boilerplate default.
+			//
+			// Fields are organised by `ui.group` (`strings_network`,
+			// `strings_biometric`, `strings_qr`, …) so the Vue admin can
+			// split them into themed cards without re-listing the keys.
+			'app_strings' => array_merge(
+				[
+					'type' => 'object',
+					'label' => __( 'In-App Strings', 'appress' ),
+					'sanitize' => 'object',
+				],
+				\Appress\app_strings_schema_block()
+			),
 		]
 	],
 

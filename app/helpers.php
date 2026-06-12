@@ -1192,3 +1192,99 @@ function get_native_class_ids( int $app_id = 0 ): array {
 		'notificationsFeed' => $hmac( 'NotificationsFeed' ),
 	];
 }
+
+/**
+ * In-app strings schema block. Returns `default` + `fields` arrays for
+ * the `app_strings` object in `schema.config.php`. Kept here (not
+ * inline) because there are 36 entries and inlining would dwarf the
+ * surrounding build_config block. Group keys (`strings_network`,
+ * `strings_biometric`, ...) drive the Vue card grouping in the
+ * `build-strings` tab.
+ *
+ * The Build Engine's iOS / Android injectors merge each non-empty
+ * customer value over the boilerplate `i18n.json` defaults in EVERY
+ * locale slot — so the cross-build `__cstring` fingerprint Apple's
+ * 4.3(a) cluster ML reads varies per app even when the customer only
+ * types in one language. Empty → engine falls back to the default
+ * defined here (which matches the boilerplate i18n.json `en` slot).
+ */
+function app_strings_schema_block() : array {
+	$entries = [
+		// [ key, label, default, group, rows ]
+		// strings_network
+		[ 'NO_INTERNET',              __( 'No internet — title', 'appress' ),         'No Internet Connection',                                              'strings_network',   1 ],
+		[ 'NETWORK_ERROR',            __( 'Network error — title', 'appress' ),       'Network Error',                                                       'strings_network',   1 ],
+		[ 'TRY_AGAIN',                __( 'Try again — button', 'appress' ),          'TRY AGAIN',                                                           'strings_network',   1 ],
+		// strings_biometric
+		[ 'BIOMETRIC_PROMPT_TITLE',   __( 'Biometric prompt title', 'appress' ),      'Sign in',                                                             'strings_biometric', 1 ],
+		[ 'BIOMETRIC_PROMPT_SUBTITLE',__( 'Biometric prompt subtitle', 'appress' ),   'Unlock with Face ID or Touch ID',                                     'strings_biometric', 2 ],
+		[ 'BIOMETRIC_FALLBACK',       __( 'Biometric fallback button', 'appress' ),   'Use password',                                                        'strings_biometric', 1 ],
+		[ 'BIOMETRIC_OFFER_TITLE',    __( 'Biometric offer title', 'appress' ),       'Enable faster sign-in?',                                              'strings_biometric', 1 ],
+		[ 'BIOMETRIC_OFFER_BODY',     __( 'Biometric offer body', 'appress' ),        'Use Face ID or Touch ID next time instead of typing your password.', 'strings_biometric', 2 ],
+		[ 'BIOMETRIC_OFFER_YES',      __( 'Biometric offer — yes', 'appress' ),       'Enable',                                                              'strings_biometric', 1 ],
+		[ 'BIOMETRIC_OFFER_NO',       __( 'Biometric offer — no', 'appress' ),        'Not now',                                                             'strings_biometric', 1 ],
+		// strings_alerts
+		[ 'ALERT_OK',                 __( 'Alert OK button', 'appress' ),             'OK',                                                                  'strings_alerts',    1 ],
+		// strings_qr
+		[ 'QR_SCAN_TITLE',            __( 'QR scanner title', 'appress' ),            'Scan QR code',                                                        'strings_qr',        1 ],
+		[ 'QR_SCANNER_PROMPT',        __( 'QR scanner prompt', 'appress' ),           'Point at the QR shown on the website',                                'strings_qr',        2 ],
+		[ 'QR_SCANNER_CANCEL',        __( 'QR scanner cancel', 'appress' ),           'Cancel',                                                              'strings_qr',        1 ],
+		[ 'QR_CAMERA_DENIED_TITLE',   __( 'QR camera denied — title', 'appress' ),    'Camera permission needed',                                            'strings_qr',        1 ],
+		[ 'QR_CAMERA_DENIED_BODY',    __( 'QR camera denied — body', 'appress' ),     'Open Settings → Camera to allow scanning.',                           'strings_qr',        2 ],
+		[ 'QR_OPEN_SETTINGS',         __( 'QR open settings button', 'appress' ),     'Open Settings',                                                       'strings_qr',        1 ],
+		[ 'QR_SCANNER_ERROR_TITLE',   __( 'QR scanner error — title', 'appress' ),    'Scanner error',                                                       'strings_qr',        1 ],
+		[ 'QR_CAMERA_UNAVAILABLE',    __( 'QR camera unavailable', 'appress' ),       'Camera unavailable on this device.',                                  'strings_qr',        2 ],
+		[ 'QR_OUTPUT_FAILED',         __( 'QR output failed', 'appress' ),            'Failed to attach scanner output.',                                    'strings_qr',        2 ],
+		[ 'QR_UNSUPPORTED_TITLE',     __( 'QR unsupported — title', 'appress' ),      'Unsupported QR code',                                                 'strings_qr',        1 ],
+		[ 'QR_UNSUPPORTED_BODY',      __( 'QR unsupported — body', 'appress' ),       "This QR doesn't contain a supported payload.",                        'strings_qr',        2 ],
+		[ 'QR_WRONG_SITE_TITLE',      __( 'QR wrong site — title', 'appress' ),       'Wrong website',                                                       'strings_qr',        1 ],
+		[ 'QR_WRONG_SITE_BODY',       __( 'QR wrong site — body', 'appress' ),        'This QR is for a different site.',                                    'strings_qr',        2 ],
+		[ 'QR_CONFIRM_TITLE',         __( 'QR confirm — title', 'appress' ),          'Sign in to website?',                                                 'strings_qr',        1 ],
+		[ 'QR_CONFIRM_BODY',          __( 'QR confirm — body', 'appress' ),           'Only approve if you just scanned this code yourself.',                'strings_qr',        2 ],
+		[ 'QR_CONFIRM_YES',           __( 'QR confirm — yes', 'appress' ),            'Sign in',                                                             'strings_qr',        1 ],
+		[ 'QR_CONFIRM_NO',            __( 'QR confirm — no', 'appress' ),             'Cancel',                                                              'strings_qr',        1 ],
+		[ 'QR_APPROVED_TOAST',        __( 'QR approved toast', 'appress' ),           'Sign-in approved on web.',                                            'strings_qr',        2 ],
+		[ 'QR_FAILED_TITLE',          __( 'QR failed — title', 'appress' ),           'Sign-in failed',                                                      'strings_qr',        1 ],
+		[ 'QR_FAILED_BODY',           __( 'QR failed — body', 'appress' ),            'Try again.',                                                          'strings_qr',        1 ],
+		[ 'QR_FAILED_TOAST',          __( 'QR failed toast', 'appress' ),             'Sign-in failed. Try again.',                                          'strings_qr',        2 ],
+		// strings_file_picker
+		[ 'FILE_PICKER_TITLE',        __( 'File picker title', 'appress' ),           'Choose source',                                                       'strings_file_picker', 1 ],
+		[ 'FILE_PICKER_CAMERA',       __( 'File picker — camera', 'appress' ),        'Camera',                                                              'strings_file_picker', 1 ],
+		[ 'FILE_PICKER_GALLERY',      __( 'File picker — gallery', 'appress' ),       'Gallery',                                                             'strings_file_picker', 1 ],
+		[ 'FILE_PICKER_FILE',         __( 'File picker — file', 'appress' ),          'File',                                                                'strings_file_picker', 1 ],
+		// strings_misc — strings that used to be hardcoded in native code,
+		// migrated into i18n so the customer can override them from the
+		// In-App Strings tab the same way as every other user-facing string.
+		[ 'ERROR_TITLE',              __( 'Generic error alert title', 'appress' ),    'An error occurred',                                                  'strings_misc',      1 ],
+		[ 'OFFLINE_TOAST',            __( 'Offline toast message', 'appress' ),       'No internet',                                                         'strings_misc',      1 ],
+		[ 'CAMERA_TITLE',             __( 'In-app camera screen title', 'appress' ),  'Take a photo',                                                        'strings_misc',      1 ],
+	];
+
+	$defaults = [];
+	$fields   = [];
+	foreach ( $entries as $row ) {
+		[ $key, $label, $default, $group, $rows ] = $row;
+		// Pre-fill each field with the English boilerplate value. Admin
+		// sees the form populated on first open; can edit (override for
+		// their app's language) or leave as-is. Empty input mid-edit
+		// still works — engine falls back to the same boilerplate at
+		// build time — but the visible default removes the
+		// "what should I write here?" cliff for new admins.
+		$defaults[ $key ] = $default;
+		$fields[ $key ] = [
+			'type'     => 'textarea',
+			'label'    => $label,
+			'sanitize' => 'textarea',
+			'default'  => $default,
+			'ui'       => [
+				'group'       => $group,
+				'rows'        => $rows,
+				'placeholder' => $default,
+			],
+		];
+	}
+	return [
+		'default' => $defaults,
+		'fields'  => $fields,
+	];
+}
