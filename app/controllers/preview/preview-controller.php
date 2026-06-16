@@ -198,6 +198,43 @@ class Preview_Controller extends Base_Controller {
 		// switching from inside Preview is a silent no-op.
 		$hydrated = (array) apply_filters( 'appress/app/live_config', $hydrated, $app_id );
 
+		// Resolve `type === 'home_screen'` bottom-nav items by stamping the
+		// global Home Screen URL onto them. The Vue admin deliberately
+		// leaves a home_screen-action item's `url` EMPTY (it shows
+		// `home_screen.url` read-only so the admin doesn't type the same
+		// permalink twice), so the CONSUMER must fill it in. The build
+		// pipeline does this in 01-pre-config.js for customer builds; the
+		// host preview app loads this hydrated config LIVE and needs the
+		// same treatment — without it, tapping a Home Screen tab inside
+		// Preview shows "Tab URL is empty". Falls back to the site root
+		// when the admin picked the action but never set a Home Screen,
+		// mirroring the engine's resolveCustomerDefaultUrl() last resort.
+		if ( isset( $hydrated['bottom_navigation']['items'] )
+			&& is_array( $hydrated['bottom_navigation']['items'] ) ) {
+
+			$home_url = '';
+			if ( isset( $hydrated['home_screen']['url'] ) && is_string( $hydrated['home_screen']['url'] ) ) {
+				$home_url = trim( $hydrated['home_screen']['url'] );
+			}
+			if ( $home_url === '' ) {
+				$home_url = trim( (string) ( $hydrated['url'] ?? '' ) );
+				if ( $home_url === '' ) {
+					$home_url = home_url( '/' );
+				}
+			}
+
+			if ( $home_url !== '' ) {
+				foreach ( $hydrated['bottom_navigation']['items'] as &$nav_item ) {
+					if ( is_array( $nav_item )
+						&& ( $nav_item['type'] ?? '' ) === 'home_screen'
+						&& empty( $nav_item['url'] ) ) {
+						$nav_item['url'] = $home_url;
+					}
+				}
+				unset( $nav_item );
+			}
+		}
+
 		return $hydrated;
 	}
 
