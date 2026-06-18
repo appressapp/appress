@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.37
+Stable tag: 1.0.0.38
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.38 =
+* Reliability improvements for the Home Screen navigation tab and app configuration handling.
 
 = 1.0.0.37 =
 * Fixed a Bottom Navigation tab set to the "Home Screen" action showing a "Tab URL is empty" error — it now opens your Home Screen correctly.
@@ -312,6 +315,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.38 =
+Reliability improvements for the Home Screen navigation tab and app configuration.
 
 = 1.0.0.37 =
 Fixes a "Home Screen" bottom-nav tab showing an empty-URL error.

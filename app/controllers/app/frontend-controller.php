@@ -650,6 +650,46 @@ JS;
 			 * @param array $live_config Boot payload returned to native.
 			 * @param int   $app_id      App ID being booted.
 			 */
+			// Resolve `type === 'home_screen'` bottom-nav items by stamping
+			// the global Home Screen URL onto them. The Vue admin leaves a
+			// home_screen-action item's `url` EMPTY by design (it shows
+			// `home_screen.url` read-only so the admin doesn't type the
+			// same permalink twice), so the CONSUMER must fill it in —
+			// otherwise tapping a Home Screen tab shows "Tab URL is empty".
+			// Mirrors 01-pre-config.js (customer builds) +
+			// Preview_Controller (host preview). Backward compatible: only
+			// stamps an item that has NO url, never overwrites an existing
+			// one, so older payloads + already-resolved items are untouched.
+			// Falls back to the site root when the admin picked the action
+			// but never set a Home Screen. Placed BEFORE the `live_config`
+			// filter so TranslatePress translates the stamped URL like any
+			// other nav URL.
+			if ( isset( $live_config['bottom_navigation']['items'] )
+				&& is_array( $live_config['bottom_navigation']['items'] ) ) {
+
+				$home_url = '';
+				if ( isset( $live_config['home_screen']['url'] ) && is_string( $live_config['home_screen']['url'] ) ) {
+					$home_url = trim( $live_config['home_screen']['url'] );
+				}
+				if ( $home_url === '' ) {
+					$home_url = trim( (string) ( $live_config['url'] ?? '' ) );
+					if ( $home_url === '' ) {
+						$home_url = home_url( '/' );
+					}
+				}
+
+				if ( $home_url !== '' ) {
+					foreach ( $live_config['bottom_navigation']['items'] as &$nav_item ) {
+						if ( is_array( $nav_item )
+							&& ( $nav_item['type'] ?? '' ) === 'home_screen'
+							&& empty( $nav_item['url'] ) ) {
+							$nav_item['url'] = $home_url;
+						}
+					}
+					unset( $nav_item );
+				}
+			}
+
 			$live_config = (array) apply_filters( 'appress/app/live_config', $live_config, $app_id );
 
 			return wp_send_json([

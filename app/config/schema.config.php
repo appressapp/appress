@@ -17,24 +17,10 @@ return [
 				'required' => true,
 				'ui' => [ 'group' => 'app_info', 'placeholder' => __( 'E.g. My Awesome App', 'appress' ) ]
 			],
-			// Auto-detected from `home_url()` in the save handler — never
-			// rendered as an admin-editable input (SingleAppView.vue skips
-			// the `url` row in the app_info field loop). Kept in the
-			// schema for storage shape consistency: native + build engine
-			// keep reading `build_config.url` as the website root, so
-			// hiding the field doesn't require touching downstream
-			// consumers. `required` dropped since the admin can't type it.
-			'url' => [
-				'type' => 'url',
-				'label' => __( 'Website URL', 'appress' ),
-				'sanitize' => 'url',
-				'default' => '',
-				'ui' => [
-					'group' => 'app_info',
-					'placeholder' => 'https://example.com',
-					'hint' => __( 'Root URL of your website (auto-detected).', 'appress' )
-				]
-			],
+			// Website URL lives on the Central app post's `website` field now,
+			// not in client build_config. Central injects it into the build
+			// payload directly (`Build_Controller::trigger_build_engine`), so
+			// the client neither stores nor forwards a root URL any more.
 			'logo' => [
 				'type' => 'file',
 				'label' => __( 'Application Logo', 'appress' ),

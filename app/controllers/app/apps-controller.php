@@ -534,12 +534,10 @@ class Apps_Controller extends Base_Controller {
 				}
 
 				if ( $category === 'build_config' ) {
-					// `url` (Website URL) is admin-hidden and auto-detected
-					// — overwrite whatever the client sent with the canonical
-					// `home_url()` so the build engine + native code never
-					// receive a stale or hand-edited value. Single source of
-					// truth = the WP install this admin runs on.
-					$sanitized_category['url'] = home_url();
+					// Website URL is no longer stored/forwarded by the client —
+					// Central sources it from the app post's `website` field and
+					// injects it into the build payload directly. See
+					// `Build_Controller::trigger_build_engine`.
 					// Bump time hash so the host preview app (my.appress.app)
 					// can short-circuit on cold-start when nothing changed.
 					$sanitized_category['update_time_hash'] = (string) time();
@@ -834,10 +832,17 @@ class Apps_Controller extends Base_Controller {
 				throw new \Exception( esc_html__( 'This Connection Token is already linked to an existing App on this website.', 'appress' ) );
 			}
 
-			// Call Central SaaS to verify token and fetch package-id
+			// Call Central SaaS to verify token and fetch package-id.
+			// `site_url` (this site's `home_url()`) lets Central reject a token
+			// being used on the wrong website: a token is bound to exactly one
+			// app post, which carries the registered `website` URL — Central
+			// compares the two hosts and refuses the connect on a mismatch.
 			$response = wp_remote_post( APPRESS_CENTRAL_URL . '/?my_appress=1&action=app.connect', [
 				'headers'   => [ 'Content-Type' => 'application/json' ],
-				'body'      => wp_json_encode( [ 'connection_token' => $token ] ),
+				'body'      => wp_json_encode( [
+					'connection_token' => $token,
+					'site_url'         => home_url(),
+				] ),
 				'timeout'   => 15,
 				'sslverify' => ! ( defined( 'APPRESS_IS_DEV' ) && \APPRESS_IS_DEV )
 			] );
