@@ -784,6 +784,29 @@ return [
 							'custom_indicator_style'     => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false ],
 							'indicator_background_color' => [ 'type' => 'color', 'sanitize' => 'text', 'default' => '' ],
 							'indicator_color'            => [ 'type' => 'color', 'sanitize' => 'text', 'default' => '' ],
+							// Per-item FEATURED style — exactly ONE item may be
+							// featured at a time (the Vue admin auto-unsets the
+							// others on toggle). A featured tab renders as a
+							// prominent raised button: its own background + icon
+							// colours, corner radius, size, raised offset above the
+							// bar, border, and box shadow. In the app the LABEL is
+							// dropped (icon only) so the enlarged button never
+							// collides with text. `is_featured=false` → normal tab.
+							'is_featured'                  => [ 'type' => 'boolean', 'sanitize' => 'boolean', 'default' => false ],
+							'featured_background_color'      => [ 'type' => 'color',   'sanitize' => 'text',    'default' => '' ],
+							'featured_background_color_dark' => [ 'type' => 'color',   'sanitize' => 'text',    'default' => '' ],
+							'featured_icon_color'            => [ 'type' => 'color',   'sanitize' => 'text',    'default' => '' ],
+							'featured_icon_color_dark'       => [ 'type' => 'color',   'sanitize' => 'text',    'default' => '' ],
+							'featured_corner_radius'         => [ 'type' => 'number',  'sanitize' => 'number',  'default' => 999 ],
+							'featured_size'                  => [ 'type' => 'number',  'sanitize' => 'number',  'default' => 56 ],
+							'featured_raise'                 => [ 'type' => 'number',  'sanitize' => 'number',  'default' => 8 ],
+							'featured_border_width'          => [ 'type' => 'number',  'sanitize' => 'number',  'default' => 0 ],
+							'featured_border_color'          => [ 'type' => 'color',   'sanitize' => 'text',    'default' => '' ],
+							'featured_border_color_dark'     => [ 'type' => 'color',   'sanitize' => 'text',    'default' => '' ],
+							'featured_shadow_color'          => [ 'type' => 'color',   'sanitize' => 'text',    'default' => '#000000' ],
+							'featured_shadow_opacity'        => [ 'type' => 'number',  'sanitize' => 'number',  'default' => 0 ],
+							'featured_shadow_radius'         => [ 'type' => 'number',  'sanitize' => 'number',  'default' => 8 ],
+							'featured_shadow_offset_y'       => [ 'type' => 'number',  'sanitize' => 'number',  'default' => 2 ],
 						]
 					]
 				]

@@ -25,6 +25,7 @@
 	// for the full explanation. Same pattern reused.
 	var IDS = window.AppressClassIds || {};
 	var NB_KEY = IDS.native        || 'AppressNativeBridge';
+	var MB_KEY = IDS.master        || 'AppressMasterBridge';
 	var LI_KEY = IDS.linkIntercept || 'AppressLinkIntercept';
 	var NS_KEY = IDS.namespace     || 'Appress';
 
@@ -44,6 +45,21 @@
 			if (mh && mh[LI_KEY]) {
 				mh[LI_KEY].postMessage({ type: type });
 				return true;
+			}
+			// Android Capacitor master (home-screen) WebView has NO native
+			// slave bridge — it exposes the master bridge with direct
+			// open methods instead. Without this fallback the open-menu
+			// button on a master-rendered page (the home screen) does
+			// nothing: `window[NB_KEY]` is undefined there, and onClick
+			// already stopPropagation'd the event so the native master
+			// link-interceptor never sees it. Mirrors the NB→MB fallback
+			// in translatepress-switcher.js. (Close events only fire when
+			// the button sits INSIDE a drawer, which is a slave WebView
+			// where NB exists — so only the open methods are needed here.)
+			var mb = window[MB_KEY];
+			if (mb) {
+				if (type === 'open_side_menu'  && typeof mb.openSideMenu  === 'function') { mb.openSideMenu();  return true; }
+				if (type === 'open_right_menu' && typeof mb.openRightMenu === 'function') { mb.openRightMenu(); return true; }
 			}
 		} catch (e) {}
 		return false;

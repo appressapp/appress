@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.38
+Stable tag: 1.0.0.39
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,10 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.39 =
+* New: highlight one Bottom Navigation item as a Featured button — a prominent, raised icon with its own shape, size, colors and border. Great for a standout central action.
+* Reliability improvement for the menu open/close button.
 
 = 1.0.0.38 =
 * Reliability improvements for the Home Screen navigation tab and app configuration handling.
@@ -315,6 +319,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.39 =
+Adds a Featured Bottom Navigation button option and a menu button reliability fix.
 
 = 1.0.0.38 =
 Reliability improvements for the Home Screen navigation tab and app configuration.
