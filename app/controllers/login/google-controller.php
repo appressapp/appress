@@ -89,11 +89,21 @@ class Google_Controller extends \Appress\Controllers\Base_Controller {
 				}
 			}
 
-			// Extract CLIENT_ID from the iOS GoogleService-Info.plist.
+			// Extract EVERY native OAuth client id from the iOS
+			// GoogleService-Info.plist — both CLIENT_ID (iOS) AND
+			// ANDROID_CLIENT_ID. Firebase projects that never wrote the Android
+			// client into google-services.json (its `oauth_client` array is
+			// empty) keep their native client ids ONLY here, so grabbing just
+			// CLIENT_ID dropped the other platform's audience and rejected its
+			// sign-in token (the Google login then hung on its spinner). The
+			// pattern matches a Google OAuth client id shape; REVERSED_CLIENT_ID
+			// (`com.googleusercontent.apps.*`) doesn't match and is skipped.
 			$ios_plist = ! empty( $build_info['firebase_ios'] ) ? $build_info['firebase_ios'] : '';
 			if ( $ios_plist ) {
-				if ( preg_match( '/<key>CLIENT_ID<\/key>\s*<string>([^<]+)<\/string>/', $ios_plist, $matches ) ) {
-					$allowed_client_ids[] = $matches[1];
+				if ( preg_match_all( '/<string>(\d+-[a-z0-9]+\.apps\.googleusercontent\.com)<\/string>/i', $ios_plist, $matches ) ) {
+					foreach ( $matches[1] as $client_id ) {
+						$allowed_client_ids[] = $client_id;
+					}
 				}
 			}
 
