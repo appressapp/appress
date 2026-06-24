@@ -4,7 +4,7 @@ Tags: mobile app, app builder, push notifications, ios, android
 Requires at least: 5.8
 Tested up to: 6.9
 Requires PHP: 8.3
-Stable tag: 1.0.0.41
+Stable tag: 1.0.0.42
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -142,6 +142,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 
 
 == Changelog ==
+
+= 1.0.0.42 =
+* Internal reliability and cleanup improvements.
 
 = 1.0.0.41 =
 * New iOS Config tab: choose which Apple devices (iPhone and/or iPad) your app supports.
@@ -326,6 +329,9 @@ Privacy Policy: https://www.apple.com/legal/privacy/
 * Initial release.
 
 == Upgrade Notice ==
+
+= 1.0.0.42 =
+Internal reliability and cleanup improvements.
 
 = 1.0.0.41 =
 Adds iPhone/iPad device targeting and clearer bottom-navigation item states.
