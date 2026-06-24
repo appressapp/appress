@@ -195,6 +195,33 @@ return [
 				]
 			],
 
+			// Supported Devices — drives the iOS `TARGETED_DEVICE_FAMILY`
+			// build setting (1=iPhone, 2=iPad, "1,2"=Universal). The Build
+			// Engine reads these from the build_config payload and rewrites
+			// the App target's device family. Both default true (Universal).
+			// iOS-only: Android has no equivalent — every APK runs on all
+			// touchscreen form factors by design.
+			'ios_support_iphone' => [
+				'type' => 'boolean',
+				'label' => __( 'iPhone', 'appress' ),
+				'sanitize' => 'boolean',
+				'default' => true,
+				'ui' => [
+					'group' => 'ios_devices',
+					'hint' => __( 'Make the app available on iPhone.', 'appress' ),
+				]
+			],
+			'ios_support_ipad' => [
+				'type' => 'boolean',
+				'label' => __( 'iPad', 'appress' ),
+				'sanitize' => 'boolean',
+				'default' => true,
+				'ui' => [
+					'group' => 'ios_devices',
+					'hint' => __( 'Make the app available on iPad.', 'appress' ),
+				]
+			],
+
 
 		
 			// package_id stays inside build_config JSON — the Build Engine
